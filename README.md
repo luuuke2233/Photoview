@@ -1,6 +1,6 @@
 # PhotoView - 高性能 macOS 相册应用
 
-PhotoView 是一款专为 macOS 打造的轻量级、高性能相册浏览工具。
+PhotoView 是一款专为 macOS 打造的轻量级相册浏览工具。
 
 ## ✨ 核心特性
 
