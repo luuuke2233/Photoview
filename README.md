@@ -1,4 +1,4 @@
-# PhotoView - 极简易 macOS 相册应用
+# PhotoView - 简易 macOS 相册应用
 
 PhotoView 是一款专为 macOS 打造的轻量级相册浏览工具。
 功能简单，仅用于浏览文件夹中的图片和视频文件。可以通过右键文件在Finder中显示。
