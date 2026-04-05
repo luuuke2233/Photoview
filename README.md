@@ -3,6 +3,8 @@
 PhotoView 是一款专为 macOS 打造的轻量级相册浏览工具，适用于搭载M芯片的Macbook。
 功能简单，仅用于浏览文件夹中的图片和视频文件。可通过右键文件在Finder中显示。
 
+<img width="1273" height="942" alt="截屏2026-04-04 20 00 46" src="https://github.com/user-attachments/assets/7c663668-ea7e-429e-b991-4814adeabd5a" />
+
 ## ✨ 核心特性
 
 - 🎬 **多格式视频支持**
