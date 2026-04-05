@@ -1,5 +1,7 @@
 # PhotoView
 
+轻量级 macOS 相册浏览应用，支持多种图片和视频格式 | macOS photo gallery app with multi-format support
+
 [English](#english) | [中文](#中文)
 
 ---
