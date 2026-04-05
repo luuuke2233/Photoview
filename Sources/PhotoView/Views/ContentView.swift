@@ -1,6 +1,6 @@
 import SwiftUI
 
-let appVersion = "1.3.3"
+let appVersion = "1.3.7-beta"
 
 struct ContentView: View {
     @EnvironmentObject var lib: LibraryManager
@@ -26,6 +26,11 @@ struct ContentView: View {
                 MediaGridView()
                     .frame(maxWidth: .infinity)
                     .toolbar {
+                        ToolbarItem(placement: .primaryAction) { Button(action: {
+                            Task { await lib.refreshCurrentFolder() }
+                        }) {
+                            Image(systemName: "arrow.clockwise")
+                        }}
                         ToolbarItem(placement: .primaryAction) { Button("添加文件夹", systemImage: "folder.badge.plus") { showImporter = true } }
                         ToolbarItem(placement: .primaryAction) { Picker("筛选", selection: $lib.filterOption) { ForEach(FilterOption.allCases) { Text($0.rawValue).tag($0) } }.pickerStyle(.segmented).frame(width: 180) }
                         ToolbarItem(placement: .primaryAction) { Picker("排序", selection: $lib.sortOption) { ForEach(SortOption.allCases) { Text($0.rawValue).tag($0) } }.pickerStyle(.menu) }
@@ -85,10 +90,14 @@ struct FolderRow: View {
                     Spacer().frame(width: 16)
                 }
                 
-                Button(action: { lib.selectFolder(node) }) {
+                Button(action: { 
+                    if node.isAvailable {
+                        lib.selectFolder(node) 
+                    }
+                }) {
                     HStack {
-                        Image(systemName: "folder.fill").foregroundColor(.blue)
-                        Text(node.name).lineLimit(1)
+                        Image(systemName: "folder.fill").foregroundColor(node.isAvailable ? .blue : .gray)
+                        Text(node.name).foregroundColor(node.isAvailable ? .primary : .gray).lineLimit(1)
                         if node.mediaCount > 0 {
                             Text("(\(node.mediaCount))").font(.caption).foregroundColor(.secondary)
                         }

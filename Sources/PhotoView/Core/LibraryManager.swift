@@ -10,6 +10,7 @@ struct FolderNode: Identifiable, Equatable, Hashable {
     let id: UUID; let url: URL; let name: String
     var children: [FolderNode] = []; var mediaCount: Int = 0
     var isScanned: Bool = false
+    var isAvailable: Bool = true
     static func == (l: FolderNode, r: FolderNode) -> Bool { l.id == r.id }
     func hash(into h: inout Hasher) { h.combine(id) }
 }
@@ -33,8 +34,11 @@ class LibraryManager: ObservableObject {
     private let thumbnailCache = NSCache<NSString, NSImage>()
     private var db: OpaquePointer?
     private let pageSize = 200
+    private let maxLoadedItems = 1000
     private var currentOffset = 0
     var hasMore = true
+    private var folderWatchers: [UUID: DispatchSourceFileSystemObject] = [:]
+    private var currentWatchedFolderId: UUID?
     
     init() {
         thumbnailCache.countLimit = 500
@@ -68,10 +72,16 @@ class LibraryManager: ObservableObject {
         
         selectedRootFolder = node
         selectedFolder = node
+        currentWatchedFolderId = node.id
         Task { await scanAndLoadLevel(node: node) }
+        startWatching(folder: node)
     }
     
     func removeFolder(_ node: FolderNode) {
+        if currentWatchedFolderId == node.id {
+            stopWatching(folderId: node.id)
+            currentWatchedFolderId = nil
+        }
         removeNodeFromTree(node)
         var stmt: OpaquePointer?
         if sqlite3_prepare_v2(db, "DELETE FROM media WHERE folderPath = ?", -1, &stmt, nil) == SQLITE_OK {
@@ -83,6 +93,10 @@ class LibraryManager: ObservableObject {
             selectedFolder = rootFolders.first
             selectedRootFolder = rootFolders.first
             resetAndLoadItems()
+            if let newFolder = rootFolders.first {
+                currentWatchedFolderId = newFolder.id
+                if newFolder.isAvailable { startWatching(folder: newFolder) }
+            }
         }
     }
     
@@ -100,6 +114,13 @@ class LibraryManager: ObservableObject {
     func openInFinder(url: URL) { NSWorkspace.shared.activateFileViewerSelecting([url]) }
     
     func selectFolder(_ node: FolderNode) {
+        if currentWatchedFolderId != node.id {
+            if let oldId = currentWatchedFolderId { stopWatching(folderId: oldId) }
+            currentWatchedFolderId = node.id
+            if node.isAvailable {
+                startWatching(folder: node)
+            }
+        }
         selectedFolder = node
         if rootFolders.contains(where: { $0.id == node.id }) { selectedRootFolder = node }
         if let existingNode = findNodeInTree(node.id) {
@@ -113,14 +134,22 @@ class LibraryManager: ObservableObject {
         }
     }
     
-    private func resetAndLoadItems() { currentOffset = 0; hasMore = true; filteredItems = []; loadNextPage() }
+    private func resetAndLoadItems() { 
+        currentOffset = 0 
+        hasMore = true 
+        filteredItems = [] 
+        loadNextPage() 
+    }
     
     func loadNextPage() {
         guard hasMore, let folder = selectedFolder else { return }
+        guard filteredItems.count < maxLoadedItems else { hasMore = false; return }
         isLoading = true
         let items = queryItems(folder: folder, offset: currentOffset, limit: pageSize)
         filteredItems.append(contentsOf: items)
-        currentOffset += items.count; hasMore = items.count == pageSize; isLoading = false
+        currentOffset += items.count; 
+        hasMore = items.count == pageSize && filteredItems.count < maxLoadedItems; 
+        isLoading = false
     }
     
     func refreshFilter() { resetAndLoadItems() }
@@ -180,18 +209,31 @@ class LibraryManager: ObservableObject {
             var isStale = false
             do {
                 let url = try URL(resolvingBookmarkData: data, options: .withSecurityScope, bookmarkDataIsStale: &isStale)
-                if !isStale {
+                var isAvailable = FileManager.default.fileExists(atPath: url.path)
+                if !isAvailable && isStale {
+                    if let newData = try? url.bookmarkData(options: .withSecurityScope, includingResourceValuesForKeys: nil, relativeTo: nil) {
+                        let newURL = try URL(resolvingBookmarkData: newData, options: .withSecurityScope, bookmarkDataIsStale: &isStale)
+                        isAvailable = FileManager.default.fileExists(atPath: newURL.path)
+                        if isAvailable {
+                            let acc = newURL.startAccessingSecurityScopedResource()
+                            if acc { loadedFolders.append(FolderNode(id: UUID(), url: newURL, name: newURL.lastPathComponent, isAvailable: true)) }
+                            continue
+                        }
+                    }
+                }
+                if isAvailable {
                     let acc = url.startAccessingSecurityScopedResource()
-                    if acc { loadedFolders.append(FolderNode(id: UUID(), url: url, name: url.lastPathComponent)) }
+                    if acc { loadedFolders.append(FolderNode(id: UUID(), url: url, name: url.lastPathComponent, isAvailable: true)) }
+                } else {
+                    loadedFolders.append(FolderNode(id: UUID(), url: url, name: url.lastPathComponent, isAvailable: false))
                 }
             } catch { print("Failed to resolve bookmark: \(error)") }
         }
         rootFolders = loadedFolders
         if let f = rootFolders.first { selectedRootFolder = f; selectedFolder = f }
         
-        // 并行扫描所有根文件夹
         await withTaskGroup(of: (UUID, FolderNode).self) { group in
-            for var node in rootFolders {
+            for var node in rootFolders where node.isAvailable {
                 group.addTask {
                     await self.scanFolderInternal(&node)
                     return (node.id, node)
@@ -204,6 +246,49 @@ class LibraryManager: ObservableObject {
             }
         }
         resetAndLoadItems()
+    }
+    
+    func refreshFolderStatus() async {
+        for i in 0..<rootFolders.count {
+            let url = rootFolders[i].url
+            let exists = FileManager.default.fileExists(atPath: url.path)
+            if rootFolders[i].isAvailable != exists {
+                if exists {
+                    let acc = url.startAccessingSecurityScopedResource()
+                    if acc {
+                        var node = rootFolders[i]
+                        node.isAvailable = true
+                        await scanFolderInternal(&node)
+                        rootFolders[i] = node
+                    }
+                } else {
+                    rootFolders[i].isAvailable = false
+                }
+            }
+        }
+    }
+    
+    func refreshCurrentFolder() async {
+        guard let folder = selectedFolder else { return }
+        let folderPath = folder.url.standardizedFileURL.path
+        deleteMediaInFolder(path: folderPath)
+        thumbnailCache.removeAllObjects()
+        currentOffset = 0
+        hasMore = true
+        filteredItems = []
+        if var node = findNodeInTree(folder.id) {
+            await scanFolderInternal(&node)
+            updateNodeInTree(node)
+            loadNextPage()
+        }
+    }
+    
+    private func deleteMediaInFolder(path: String) {
+        var stmt: OpaquePointer?
+        if sqlite3_prepare_v2(db, "DELETE FROM media WHERE folderPath = ?", -1, &stmt, nil) == SQLITE_OK {
+            sqlite3_bind_text(stmt, 1, (path as NSString).utf8String, -1, nil)
+            sqlite3_step(stmt); sqlite3_finalize(stmt)
+        }
     }
     
     @MainActor func buildTree() async {
@@ -221,6 +306,31 @@ class LibraryManager: ObservableObject {
     }
     
     func expandFolder(_ node: FolderNode) async { await scanAndLoadLevel(node: node) }
+    
+    func startWatching(folder: FolderNode) {
+        stopWatching(folderId: folder.id)
+        let fd = open(folder.url.path, O_EVTONLY)
+        guard fd >= 0 else { return }
+        let source = DispatchSource.makeFileSystemObjectSource(fileDescriptor: fd, eventMask: [.write, .delete, .rename, .extend], queue: .main)
+        source.setEventHandler { [weak self] in
+            Task { @MainActor [weak self] in
+                await self?.refreshCurrentFolder()
+            }
+        }
+        source.setCancelHandler { close(fd) }
+        source.resume()
+        folderWatchers[folder.id] = source
+    }
+    
+    func stopWatching(folderId: UUID) {
+        folderWatchers[folderId]?.cancel()
+        folderWatchers.removeValue(forKey: folderId)
+    }
+    
+    func stopAllWatching() {
+        folderWatchers.values.forEach { $0.cancel() }
+        folderWatchers.removeAll()
+    }
     
     // 内部扫描逻辑（支持并行调用）
     private func scanFolderInternal(_ node: inout FolderNode) async {
