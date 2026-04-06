@@ -44,6 +44,10 @@ struct FullscreenViewer: View {
     @State private var showToolbar = false
     @State private var playerKey = UUID()
     @State private var isCleanedUp = false
+    @State private var scale: CGFloat = 1.0
+    @State private var lastScale: CGFloat = 1.0
+    @State private var imageOffset: CGSize = .zero
+    @State private var lastDragOffset: CGSize = .zero
     @ObservedObject private var localization = LocalizationManager.shared
     
     var exitFullscreenTitle: String {
@@ -68,19 +72,32 @@ struct FullscreenViewer: View {
             
             if !isCleanedUp {
                 if currentItem.type == .image, let image {
-                    Image(nsImage: image).resizable().scaledToFit()
+                    Image(nsImage: image)
+                        .resizable()
+                        .scaledToFit()
+                        .scaleEffect(scale)
+                        .offset(imageOffset)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .padding(.vertical, 1)
+                        .gesture(magnificationGesture)
+                        .gesture(dragGesture)
+                        .onTapGesture(count: 2) {
+                            withAnimation { 
+                                scale = scale > 1 ? 1 : 2
+                                if scale == 1 { imageOffset = .zero }
+                            }
+                        }
                 } else if isWebM {
                     WebMVideoPlayerView(url: currentItem.url, isPlaying: $isPlaying, currentTime: $currentTime, duration: $duration, volume: $volume, onEnded: { goNext() }, key: playerKey)
-                        .ignoresSafeArea()
+                        .frame(maxWidth: .infinity, maxHeight: .infinity).padding(.vertical, 1)
                 } else if let avPlayer {
                     AVPlayerLayerView(player: avPlayer)
-                        .ignoresSafeArea()
+                        .frame(maxWidth: .infinity, maxHeight: .infinity).padding(.vertical, 1)
                         .id(currentItem.id)
                 }
                 
                 VStack {
                     HStack {
-                        // 左上角退出按钮：清理资源并关闭窗口
                         Button(action: { actions.exit() }) {
                             Image(systemName: "arrow.down.right.and.arrow.up.left")
                                 .font(.title).foregroundColor(.white)
@@ -92,17 +109,28 @@ struct FullscreenViewer: View {
                         }.buttonStyle(.plain).padding()
                         
                         Spacer()
+                        
+                        if scale != 1.0 || imageOffset != .zero {
+                            Button(action: resetScale) {
+                                Image(systemName: "arrow.counterclockwise")
+                                    .font(.title2).foregroundColor(.white)
+                            }.buttonStyle(.plain).padding().help(localization.tr(LocalizedString.resetZoom, LocalizedString_en.resetZoom))
+                        }
                     }
                     Spacer()
                     if showToolbar {
                         DraggableToolbar(isPlaying: $isPlaying, currentTime: $currentTime, duration: $duration, volume: $volume,
-                            player: avPlayer, onPrev: goPrev, onNext: goNext, offset: $toolbarOffset, isWebM: isWebM)
+                            player: avPlayer, onPrev: goPrev, onNext: goNext, offset: $toolbarOffset, isWebM: isWebM, scale: $scale)
                             .padding(.bottom, 40)
                     }
                 }
             }
         }
         .onAppear {
+            scale = 1.0
+            lastScale = 1.0
+            imageOffset = .zero
+            lastDragOffset = .zero
             actions.cleanup = { cleanupPlayer() }
             setupMedia()
             actions.goPrev = { goPrev() }; actions.goNext = { goNext() }
@@ -192,6 +220,10 @@ struct FullscreenViewer: View {
         currentItem = n
         playerKey = UUID()
         isCleanedUp = false
+        scale = 1.0
+        lastScale = 1.0
+        imageOffset = .zero
+        lastDragOffset = .zero
         
         if n.type == .image {
             avPlayer = nil; image = nil; loadImg(url: n.url)
@@ -212,6 +244,43 @@ struct FullscreenViewer: View {
     private func loadImg(url: URL) {
         guard let s = CGImageSourceCreateWithURL(url as CFURL, nil), let cg = CGImageSourceCreateImageAtIndex(s, 0, nil) else { return }
         image = NSImage(cgImage: cg, size: .zero)
+    }
+    
+    private var magnificationGesture: some Gesture {
+        MagnificationGesture()
+            .onChanged { value in
+                let delta = value / lastScale
+                scale = max(0.5, min(5.0, scale * delta))
+                lastScale = value
+            }
+            .onEnded { _ in
+                lastScale = 1.0
+                if scale < 0.5 { scale = 0.5 }
+                if scale > 5.0 { scale = 5.0 }
+            }
+    }
+    
+    private var dragGesture: some Gesture {
+        DragGesture()
+            .onChanged { value in
+                if scale > 1.0 {
+                    imageOffset = CGSize(
+                        width: lastDragOffset.width + value.translation.width,
+                        height: lastDragOffset.height + value.translation.height
+                    )
+                }
+            }
+            .onEnded { value in
+                lastDragOffset = imageOffset
+            }
+    }
+    
+    private func resetScale() {
+        withAnimation { 
+            scale = 1.0
+            imageOffset = .zero
+            lastDragOffset = .zero
+        }
     }
 }
 
@@ -234,6 +303,7 @@ struct DraggableToolbar: View {
     @Binding var isPlaying: Bool; @Binding var currentTime: Double; @Binding var duration: Double; @Binding var volume: Double
     let player: AVPlayer?; let onPrev: () -> Void; let onNext: () -> Void; @Binding var offset: CGSize
     let isWebM: Bool
+    @Binding var scale: CGFloat
     
     var body: some View {
         HStack(spacing: 16) {
@@ -258,6 +328,13 @@ struct DraggableToolbar: View {
                 .onChange(of: volume) { _, newValue in
                     player?.volume = Float(newValue)
                 }
+            
+            if scale != 1.0 {
+                Button(action: { withAnimation { scale = 1.0 } }) {
+                    Image(systemName: "arrow.counterclockwise")
+                        .font(.title2)
+                }.buttonStyle(.plain)
+            }
         }
         .padding(12).background(.ultraThinMaterial.opacity(0.8)).cornerRadius(12).offset(offset)
         .gesture(DragGesture().onChanged { offset = $0.translation }.onEnded { _ in withAnimation { offset = .zero } })
@@ -278,7 +355,11 @@ struct AVPlayerLayerView: NSViewRepresentable {
         NSLayoutConstraint.activate([h.leadingAnchor.constraint(equalTo: c.leadingAnchor), h.trailingAnchor.constraint(equalTo: c.trailingAnchor), h.topAnchor.constraint(equalTo: c.topAnchor), h.bottomAnchor.constraint(equalTo: c.bottomAnchor)])
         return c
     }
-    func updateNSView(_ v: NSView, context: Context) { (v.subviews.first?.layer as? AVPlayerLayer)?.player = player }
+    func updateNSView(_ v: NSView, context: Context) { 
+        if let layer = v.subviews.first?.layer as? AVPlayerLayer {
+            layer.player = player
+        }
+    }
 }
 
 @MainActor final class FullscreenWindowController {

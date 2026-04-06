@@ -201,7 +201,7 @@ class LibraryManager: ObservableObject {
         UserDefaults.standard.set(bookmarks, forKey: "SavedFolderBookmarks")
     }
     
-    // 核心优化：并行加载所有根文件夹
+    // 优化：优先加载选中的文件夹，后台加载其他文件夹
     private func loadFolders() async {
         guard let savedBookmarks = UserDefaults.standard.array(forKey: "SavedFolderBookmarks") as? [Data] else { return }
         var loadedFolders: [FolderNode] = []
@@ -230,22 +230,40 @@ class LibraryManager: ObservableObject {
             } catch { print("Failed to resolve bookmark: \(error)") }
         }
         rootFolders = loadedFolders
-        if let f = rootFolders.first { selectedRootFolder = f; selectedFolder = f }
-        
-        await withTaskGroup(of: (UUID, FolderNode).self) { group in
-            for var node in rootFolders where node.isAvailable {
-                group.addTask {
-                    await self.scanFolderInternal(&node)
-                    return (node.id, node)
-                }
+        if let f = rootFolders.first { 
+            selectedRootFolder = f; 
+            selectedFolder = f 
+            // 优先立即加载选中的文件夹
+            Task {
+                await priorityScanFolder(folderId: f.id)
+                self.resetAndLoadItems()
             }
-            for await (id, updatedNode) in group {
-                if let idx = self.rootFolders.firstIndex(where: { $0.id == id }) {
-                    self.rootFolders[idx] = updatedNode
+        }
+        
+        // 后台加载其他文件夹
+        Task {
+            await withTaskGroup(of: (UUID, FolderNode).self) { group in
+                for var node in rootFolders where node.isAvailable && node.id != selectedRootFolder?.id {
+                    group.addTask {
+                        await self.scanFolderInternal(&node)
+                        return (node.id, node)
+                    }
+                }
+                for await (id, updatedNode) in group {
+                    if let idx = self.rootFolders.firstIndex(where: { $0.id == id }) {
+                        self.rootFolders[idx] = updatedNode
+                    }
                 }
             }
         }
-        resetAndLoadItems()
+    }
+    
+    // 优先扫描指定文件夹
+    private func priorityScanFolder(folderId: UUID) async {
+        guard let idx = rootFolders.firstIndex(where: { $0.id == folderId }) else { return }
+        var node = rootFolders[idx]
+        await scanFolderInternal(&node)
+        rootFolders[idx] = node
     }
     
     func refreshFolderStatus() async {

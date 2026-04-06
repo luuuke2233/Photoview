@@ -84,6 +84,7 @@ struct LocalizedString {
     static let noMediaDescription = "添加文件夹或切换筛选条件"
     static let showInFinder = "在 Finder 中显示"
     static let exitFullscreen = "退出全屏并关闭窗口"
+    static let resetZoom = "重置缩放"
 }
 
 struct LocalizedString_en {
@@ -105,4 +106,5 @@ struct LocalizedString_en {
     static let noMediaDescription = "Add a folder or change the filter"
     static let showInFinder = "Show in Finder"
     static let exitFullscreen = "Exit fullscreen"
+    static let resetZoom = "Reset Zoom"
 }

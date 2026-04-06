@@ -42,7 +42,7 @@ struct MediaItem: Identifiable, Equatable, Hashable {
     
     init(url: URL) {
         self.url = url
-        self.type = MediaType.detectType(for: url)!
+        self.type = MediaType.detectType(for: url) ?? .image
         self.name = url.lastPathComponent
         
         let attrs = try? FileManager.default.attributesOfItem(atPath: url.path)
