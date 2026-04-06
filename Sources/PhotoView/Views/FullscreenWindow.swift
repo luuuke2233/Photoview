@@ -44,6 +44,11 @@ struct FullscreenViewer: View {
     @State private var showToolbar = false
     @State private var playerKey = UUID()
     @State private var isCleanedUp = false
+    @ObservedObject private var localization = LocalizationManager.shared
+    
+    var exitFullscreenTitle: String {
+        localization.tr(LocalizedString.exitFullscreen, LocalizedString_en.exitFullscreen)
+    }
     
     var idx: Int {
         if let index = items.firstIndex(where: { $0.id == currentItem.id }) { return index }
@@ -79,7 +84,7 @@ struct FullscreenViewer: View {
                         Button(action: { actions.exit() }) {
                             Image(systemName: "arrow.down.right.and.arrow.up.left")
                                 .font(.title).foregroundColor(.white)
-                        }.buttonStyle(.plain).padding().help("退出全屏并关闭窗口")
+                        }.buttonStyle(.plain).padding().help(exitFullscreenTitle)
                         
                         Button(action: { showToolbar.toggle() }) {
                             Image(systemName: showToolbar ? "gearshape.fill" : "gearshape")

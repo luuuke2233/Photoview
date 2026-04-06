@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleName</key>
+    <string>PhotoView-Beta</string>
+    <key>CFBundleDisplayName</key>
+    <string>PhotoView-Beta</string>
+    <key>CFBundleIdentifier</key>
+    <string>com.photoview.app</string>
+    <key>CFBundleVersion</key>
+    <string>1.4.0</string>
+    <key>CFBundleShortVersionString</key>
+    <string>1.4.0-beta</string>
+    <key>CFBundleExecutable</key>
+    <string>PhotoView-beta</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>14.0</string>
+    <key>NSHighResolutionCapable</key>
+    <true/>
+    <key>NSPhotoLibraryUsageDescription</key>
+    <string>PhotoView需要访问您的照片库以查看和导出图片和视频。</string>
+</dict>
+</plist>

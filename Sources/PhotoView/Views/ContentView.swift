@@ -1,16 +1,21 @@
 import SwiftUI
 
-let appVersion = "1.3.7-beta"
+let appVersion = "1.4.0-beta"
 
 struct ContentView: View {
     @EnvironmentObject var lib: LibraryManager
     @State private var showImporter = false
     @State private var sidebarWidth: Double = 250
+    @ObservedObject private var localization = LocalizationManager.shared
+    
+    var filterPickerWidth: CGFloat {
+        localization.currentLanguage == .english ? 220 : 180
+    }
     
     var body: some View {
         ZStack(alignment: .bottomLeading) {
             HStack(spacing: 0) {
-                SidebarView()
+                SidebarView(emptyFolderTitle: localization.tr(LocalizedString.emptyFolder, LocalizedString_en.emptyFolder))
                     .frame(width: sidebarWidth, alignment: .leading)
                 
                 Divider()
@@ -30,10 +35,22 @@ struct ContentView: View {
                             Task { await lib.refreshCurrentFolder() }
                         }) {
                             Image(systemName: "arrow.clockwise")
-                        }}
-                        ToolbarItem(placement: .primaryAction) { Button("添加文件夹", systemImage: "folder.badge.plus") { showImporter = true } }
-                        ToolbarItem(placement: .primaryAction) { Picker("筛选", selection: $lib.filterOption) { ForEach(FilterOption.allCases) { Text($0.rawValue).tag($0) } }.pickerStyle(.segmented).frame(width: 180) }
-                        ToolbarItem(placement: .primaryAction) { Picker("排序", selection: $lib.sortOption) { ForEach(SortOption.allCases) { Text($0.rawValue).tag($0) } }.pickerStyle(.menu) }
+                        }.help(localization.tr(LocalizedString.refresh, LocalizedString_en.refresh))}
+                        ToolbarItem(placement: .primaryAction) { Button(localization.tr(LocalizedString.addFolder, LocalizedString_en.addFolder), systemImage: "folder.badge.plus") { showImporter = true } }
+                        ToolbarItem(placement: .primaryAction) { 
+                            Picker(localization.tr(LocalizedString.filter, LocalizedString_en.filter), selection: $lib.filterOption) { 
+                                ForEach(FilterOption.allCases) { option in
+                                    Text(localization.filterName(option)).tag(option)
+                                }
+                            }.pickerStyle(.segmented).frame(width: filterPickerWidth) 
+                        }
+                        ToolbarItem(placement: .primaryAction) { 
+                            Picker(localization.tr(LocalizedString.sort, LocalizedString_en.sort), selection: $lib.sortOption) { 
+                                ForEach(SortOption.allCases) { option in
+                                    Text(localization.sortName(option)).tag(option)
+                                }
+                            }.pickerStyle(.menu) 
+                        }
                     }
                     .onChange(of: lib.sortOption) { _, _ in lib.refreshFilter() }
                     .onChange(of: lib.filterOption) { _, _ in lib.refreshFilter() }
@@ -53,11 +70,12 @@ struct ContentView: View {
 struct SidebarView: View {
     @EnvironmentObject var lib: LibraryManager
     @State private var expandedFolders: Set<UUID> = []
+    let emptyFolderTitle: String
     
     var body: some View {
         List {
             ForEach(lib.rootFolders) { root in
-                FolderRow(expandedFolders: $expandedFolders, node: root, isRoot: true)
+                FolderRow(expandedFolders: $expandedFolders, node: root, isRoot: true, emptyFolderTitle: emptyFolderTitle)
             }
         }
         .listStyle(.sidebar)
@@ -69,6 +87,7 @@ struct FolderRow: View {
     @Binding var expandedFolders: Set<UUID>
     let node: FolderNode
     let isRoot: Bool
+    let emptyFolderTitle: String
     
     var isSelected: Bool { lib.selectedFolder?.id == node.id }
     
@@ -117,11 +136,11 @@ struct FolderRow: View {
             
             if expandedFolders.contains(node.id) {
                 ForEach(node.children) { child in
-                    FolderRow(expandedFolders: $expandedFolders, node: child, isRoot: false)
+                    FolderRow(expandedFolders: $expandedFolders, node: child, isRoot: false, emptyFolderTitle: emptyFolderTitle)
                         .padding(.leading, 16)
                 }
                 if node.children.isEmpty && node.isScanned {
-                    Text("空文件夹").font(.caption).foregroundColor(.secondary).padding(.leading, 32)
+                    Text(emptyFolderTitle).font(.caption).foregroundColor(.secondary).padding(.leading, 32)
                 }
             }
         }

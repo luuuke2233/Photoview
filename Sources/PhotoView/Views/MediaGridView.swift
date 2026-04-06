@@ -4,23 +4,23 @@ struct MediaGridView: View {
     @EnvironmentObject var lib: LibraryManager
     @State private var gridSize: Double = 140
     @State private var lastScale: CGFloat = 1.0
+    @ObservedObject private var localization = LocalizationManager.shared
     
     var body: some View {
         Group {
             if lib.isLoading && lib.filteredItems.isEmpty {
-                VStack { ProgressView(); Text("扫描中...") }
+                VStack { ProgressView(); Text(localization.tr(LocalizedString.scanning, LocalizedString_en.scanning)) }
             } else if lib.filteredItems.isEmpty && !lib.isLoading {
-                ContentUnavailableView("无媒体", systemImage: "photo", description: Text("添加文件夹或切换筛选条件"))
+                ContentUnavailableView(localization.tr(LocalizedString.noMedia, LocalizedString_en.noMedia), systemImage: "photo", description: Text(localization.tr(LocalizedString.noMediaDescription, LocalizedString_en.noMediaDescription)))
             } else {
                 ScrollView {
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: gridSize, maximum: 300))], spacing: 8) {
                         ForEach(lib.filteredItems) { item in
                             MediaCell(item: item, gridSize: gridSize)
                                 .onTapGesture(count: 2) { openFS(item: item) }
-                                // 新增：右键菜单
                                 .contextMenu {
                                     Button(action: { lib.openInFinder(url: item.url) }) {
-                                        Label("在 Finder 中显示", systemImage: "folder")
+                                        Label(localization.tr(LocalizedString.showInFinder, LocalizedString_en.showInFinder), systemImage: "folder")
                                     }
                                 }
                         }
