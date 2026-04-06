@@ -5,7 +5,7 @@ let package = Package(
     name: "PhotoView",
     platforms: [.macOS(.v14)],
     products: [
-        .executable(name: "PhotoView-beta", targets: ["PhotoView"])
+        .executable(name: "PhotoView", targets: ["PhotoView"])
     ],
     dependencies: [],
     targets: [

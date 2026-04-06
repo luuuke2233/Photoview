@@ -1,6 +1,6 @@
 import SwiftUI
 
-let appVersion = "1.4.0-beta"
+let appVersion = "1.4.0"
 
 struct ContentView: View {
     @EnvironmentObject var lib: LibraryManager
