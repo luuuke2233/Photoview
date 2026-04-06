@@ -1,6 +1,6 @@
 # PhotoView
 
-轻量级 macOS 文件夹媒体浏览应用，支持多种图片和视频格式 | macOS photo gallery app with multi-format support
+轻量级 macOS 文件夹媒体浏览应用，支持查看多种图片和视频格式 | macOS photo gallery app with multi-format support
 
 [English](#english) | [中文](#中文)
 
