@@ -1,7 +1,32 @@
 import SwiftUI
 import AppKit
 
-let appVersion = "1.5.0-beta.6"
+let appVersion = "1.5.0-beta.8"
+
+struct ToolbarButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .padding(6)
+            .background(configuration.isPressed ? Color.accentColor.opacity(0.5) : Color(nsColor: .controlBackgroundColor).opacity(0.5))
+            .foregroundColor(configuration.isPressed ? .white : .primary)
+            .cornerRadius(6)
+            .scaleEffect(configuration.isPressed ? 0.95 : 1.0)
+            .animation(.easeInOut(duration: 0.15), value: configuration.isPressed)
+    }
+}
+
+struct ToolbarLabelButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .padding(.horizontal, 8)
+            .padding(.vertical, 6)
+            .background(configuration.isPressed ? Color.accentColor.opacity(0.5) : Color(nsColor: .controlBackgroundColor).opacity(0.5))
+            .foregroundColor(configuration.isPressed ? .white : .primary)
+            .cornerRadius(6)
+            .scaleEffect(configuration.isPressed ? 0.95 : 1.0)
+            .animation(.easeInOut(duration: 0.15), value: configuration.isPressed)
+    }
+}
 
 func zoomWindow() {
     if let window = NSApp.keyWindow {
@@ -119,12 +144,14 @@ struct CustomToolbar: View {
                 Button(action: refreshAction) {
                     Image(systemName: "arrow.clockwise")
                 }
+                .buttonStyle(ToolbarButtonStyle())
                 .help(localization.tr(LocalizedString.refresh, LocalizedString_en.refresh))
                 
             case .addFolder:
                 Button(action: { showImporter = true }) {
                     Label(localization.tr(LocalizedString.addFolder, LocalizedString_en.addFolder), systemImage: "folder.badge.plus")
                 }
+                .buttonStyle(ToolbarLabelButtonStyle())
                 
             case .filter:
                 Picker(localization.tr(LocalizedString.filter, LocalizedString_en.filter), selection: $lib.filterOption) {
@@ -147,15 +174,14 @@ struct CustomToolbar: View {
                 Button(action: {}) {
                     Image(systemName: "square.grid.2x2")
                 }
+                .buttonStyle(ToolbarButtonStyle())
                 .help("View Mode")
                 
             case .folderInfo:
                 folderInfoView
             }
         }
-        .padding(6)
-        .background(Color(nsColor: .controlBackgroundColor).opacity(0.5))
-        .cornerRadius(6)
+        .buttonStyle(ToolbarButtonStyle())
     }
     
     @ViewBuilder
