@@ -139,29 +139,25 @@ struct FullscreenViewer: View {
                         }
                         
                         if currentItem.type == .image {
-                            if rotation != 0 {
-                                Button(action: { withAnimation { rotation = 0 } }) {
-                                    Image(systemName: "rotate.left")
-                                        .font(.title2).foregroundColor(.white)
-                                }.buttonStyle(.plain).padding().help(localization.tr(LocalizedString.rotateLeft, LocalizedString_en.rotateLeft))
-                            } else {
-                                Button(action: { withAnimation { rotation += 90 } }) {
-                                    Image(systemName: "rotate.right")
-                                        .font(.title2).foregroundColor(.white)
-                                }.buttonStyle(.plain).padding().help(localization.tr(LocalizedString.rotateRight, LocalizedString_en.rotateRight))
-                            }
+                            Button(action: { withAnimation { rotation -= 90 } }) {
+                                Image(systemName: "rotate.left")
+                                    .font(.title2).foregroundColor(.white)
+                            }.buttonStyle(.plain).padding().help(localization.tr(LocalizedString.rotateLeft, LocalizedString_en.rotateLeft))
+                            
+                            Button(action: { withAnimation { rotation += 90 } }) {
+                                Image(systemName: "rotate.right")
+                                    .font(.title2).foregroundColor(.white)
+                            }.buttonStyle(.plain).padding().help(localization.tr(LocalizedString.rotateRight, LocalizedString_en.rotateRight))
                         } else if currentItem.type == .video {
-                            if videoRotation != 0 {
-                                Button(action: { withAnimation { videoRotation = 0 } }) {
-                                    Image(systemName: "rotate.left")
-                                        .font(.title2).foregroundColor(.white)
-                                }.buttonStyle(.plain).padding().help(localization.tr(LocalizedString.rotateLeft, LocalizedString_en.rotateLeft))
-                            } else {
-                                Button(action: { withAnimation { videoRotation += 90 } }) {
-                                    Image(systemName: "rotate.right")
-                                        .font(.title2).foregroundColor(.white)
-                                }.buttonStyle(.plain).padding().help(localization.tr(LocalizedString.rotateRight, LocalizedString_en.rotateRight))
-                            }
+                            Button(action: { withAnimation { videoRotation -= 90 } }) {
+                                Image(systemName: "rotate.left")
+                                    .font(.title2).foregroundColor(.white)
+                            }.buttonStyle(.plain).padding().help(localization.tr(LocalizedString.rotateLeft, LocalizedString_en.rotateLeft))
+                            
+                            Button(action: { withAnimation { videoRotation += 90 } }) {
+                                Image(systemName: "rotate.right")
+                                    .font(.title2).foregroundColor(.white)
+                            }.buttonStyle(.plain).padding().help(localization.tr(LocalizedString.rotateRight, LocalizedString_en.rotateRight))
                         }
                     }
                     Spacer()
