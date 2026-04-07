@@ -456,6 +456,13 @@ class LibraryManager: ObservableObject {
         let t = genThumb(url: item.url, type: item.type, size: size)
         if let t { thumbnailCache.setObject(t, forKey: k) }; return t
     }
+    
+    func getFullImage(for item: MediaMetadata) -> NSImage? {
+        guard item.type == .image else { return nil }
+        guard let data = try? Data(contentsOf: item.url) else { return nil }
+        return NSImage(data: data)
+    }
+    
     private func genThumb(url: URL, type: MediaType, size: CGSize) -> NSImage? {
         if type == .image {
             let o: [CFString: Any] = [kCGImageSourceCreateThumbnailFromImageAlways: true, kCGImageSourceCreateThumbnailWithTransform: true, kCGImageSourceThumbnailMaxPixelSize: max(size.width, size.height) * 2]
