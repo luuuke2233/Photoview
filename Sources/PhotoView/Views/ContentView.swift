@@ -1,7 +1,7 @@
 import SwiftUI
 import AppKit
 
-let appVersion = "1.5.0-beta.9"
+let appVersion = "1.5.2"
 
 struct ToolbarButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
@@ -46,50 +46,42 @@ struct ContentView: View {
     }
     
     var body: some View {
-        ZStack(alignment: .bottomLeading) {
-            VStack(spacing: 0) {
-                CustomToolbar(
-                    toolbarManager: toolbarManager,
-                    localization: localization,
-                    filterPickerWidth: filterPickerWidth,
-                    showImporter: $showImporter,
-                    refreshAction: { Task { await lib.refreshCurrentFolder() } }
-                )
-                .frame(height: 44)
-                .background(Color(nsColor: .windowBackgroundColor))
-                .onTapGesture(count: 2) {
-                    zoomWindow()
-                }
-                .overlay(alignment: .bottom) {
-                    Divider()
-                }
-                
-                HStack(spacing: 0) {
-                    SidebarView(emptyFolderTitle: localization.tr(LocalizedString.emptyFolder, LocalizedString_en.emptyFolder))
-                        .frame(width: sidebarWidth, alignment: .leading)
-                    
-                    Divider()
-                        .frame(width: 4)
-                        .background(Color.clear)
-                        .contentShape(Rectangle())
-                        .gesture(
-                            DragGesture()
-                                .onChanged { sidebarWidth = max(200, min(500, sidebarWidth + $0.translation.width)) }
-                                .onEnded { _ in }
-                        )
-                    
-                    MediaGridView(viewMode: toolbarManager.currentViewMode)
-                        .frame(maxWidth: .infinity)
-                        .onChange(of: lib.sortOption) { _, _ in lib.refreshFilter() }
-                        .onChange(of: lib.filterOption) { _, _ in lib.refreshFilter() }
-                }
+        VStack(spacing: 0) {
+            CustomToolbar(
+                toolbarManager: toolbarManager,
+                localization: localization,
+                filterPickerWidth: filterPickerWidth,
+                showImporter: $showImporter,
+                refreshAction: { Task { await lib.refreshCurrentFolder() } }
+            )
+            .frame(height: 44)
+            .background(Color(nsColor: .windowBackgroundColor))
+            .onTapGesture(count: 2) {
+                zoomWindow()
+            }
+            .overlay(alignment: .bottom) {
+                Divider()
             }
             
-            Text("v\(appVersion)")
-                .font(.caption2)
-                .foregroundColor(.secondary)
-                .padding(8)
-                .allowsHitTesting(false)
+            HStack(spacing: 0) {
+                SidebarView(emptyFolderTitle: localization.tr(LocalizedString.emptyFolder, LocalizedString_en.emptyFolder))
+                    .frame(width: sidebarWidth, alignment: .leading)
+                
+                Divider()
+                    .frame(width: 4)
+                    .background(Color.clear)
+                    .contentShape(Rectangle())
+                    .gesture(
+                        DragGesture()
+                            .onChanged { sidebarWidth = max(200, min(500, sidebarWidth + $0.translation.width)) }
+                            .onEnded { _ in }
+                    )
+                
+                MediaGridView(viewMode: toolbarManager.currentViewMode)
+                    .frame(maxWidth: .infinity)
+                    .onChange(of: lib.sortOption) { _, _ in lib.refreshFilter() }
+                    .onChange(of: lib.filterOption) { _, _ in lib.refreshFilter() }
+            }
         }
         .overlay(alignment: .top) {
             if toolbarManager.isCustomizing {

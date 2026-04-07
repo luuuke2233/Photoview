@@ -5,6 +5,13 @@ import UniformTypeIdentifiers
 import ImageIO
 import AVFoundation
 import SQLite3
+import WebKit
+
+class WebMThumbCoordinator: NSObject, WKScriptMessageHandler {
+    let handler: (Any?) -> Void
+    init(messageHandler: @escaping (Any?) -> Void) { self.handler = messageHandler }
+    func userContentController(_ uc: WKUserContentController, didReceive m: WKScriptMessage) { handler(m.body) }
+}
 
 struct FolderNode: Identifiable, Equatable, Hashable {
     let id: UUID; let url: URL; let name: String
@@ -464,10 +471,14 @@ class LibraryManager: ObservableObject {
     }
     
     private func genThumb(url: URL, type: MediaType, size: CGSize) -> NSImage? {
+        let ext = url.pathExtension.lowercased()
+        
         if type == .image {
             let o: [CFString: Any] = [kCGImageSourceCreateThumbnailFromImageAlways: true, kCGImageSourceCreateThumbnailWithTransform: true, kCGImageSourceThumbnailMaxPixelSize: max(size.width, size.height) * 2]
             guard let s = CGImageSourceCreateWithURL(url as CFURL, nil), let cg = CGImageSourceCreateThumbnailAtIndex(s, 0, o as CFDictionary) else { return nil }
             return NSImage(cgImage: cg, size: .zero)
+        } else if ext == "webm" {
+            return nil
         } else {
             let g = AVAssetImageGenerator(asset: AVURLAsset(url: url)); g.appliesPreferredTrackTransform = true; g.maximumSize = CGSize(width: size.width * 2, height: size.height * 2)
             guard let cg = try? g.copyCGImage(at: CMTime(seconds: 1, preferredTimescale: 600), actualTime: nil) else { return nil }

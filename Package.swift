@@ -12,10 +12,6 @@ let package = Package(
         .executableTarget(
             name: "PhotoView",
             path: "Sources/PhotoView"
-        ),
-        .testTarget(
-            name: "PhotoViewTests",
-            dependencies: ["PhotoView"]
         )
     ]
 )

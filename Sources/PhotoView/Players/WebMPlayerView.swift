@@ -8,6 +8,7 @@ struct WebMPlayerView: NSViewRepresentable {
     @Binding var currentTime: Double
     @Binding var duration: Double
     @Binding var volume: Double
+    @Binding var seekTime: Double?
     let onEnded: () -> Void
     
     func makeNSView(context: Context) -> WKWebView {
@@ -19,6 +20,10 @@ struct WebMPlayerView: NSViewRepresentable {
         webView.autoresizingMask = [.width, .height]
         webView.setValue(false, forKey: "drawsBackground")
         webView.navigationDelegate = context.coordinator
+        
+        webView.configuration.userContentController.add(context.coordinator, name: "duration")
+        webView.configuration.userContentController.add(context.coordinator, name: "time")
+        webView.configuration.userContentController.add(context.coordinator, name: "ended")
         
         let parentDir = url.deletingLastPathComponent()
         let htmlFileName = ".photoview_webm_\(url.lastPathComponent.hashValue).html"
@@ -45,11 +50,14 @@ struct WebMPlayerView: NSViewRepresentable {
                 video.addEventListener('loadedmetadata', () => window.webkit.messageHandlers.duration.postMessage(video.duration));
                 video.addEventListener('timeupdate', () => window.webkit.messageHandlers.time.postMessage(video.currentTime));
                 video.addEventListener('ended', () => window.webkit.messageHandlers.ended.postMessage(true));
+                setInterval(() => {
+                    if (!video.paused) window.webkit.messageHandlers.time.postMessage(video.currentTime);
+                }, 100);
                 window.addEventListener('message', (event) => {
                     const data = event.data;
                     if (data.action === 'play') video.play();
                     if (data.action === 'pause') video.pause();
-                    if (data.action === 'seek') video.currentTime = data.time;
+                    if (data.action === 'seek') { video.currentTime = data.time; window.webkit.messageHandlers.time.postMessage(video.currentTime); }
                     if (data.action === 'volume') video.volume = data.volume;
                 });
             </script>
@@ -75,6 +83,17 @@ struct WebMPlayerView: NSViewRepresentable {
             nsView.evaluateJavaScript("document.getElementById('player')?.pause()")
         }
         nsView.evaluateJavaScript("if(document.getElementById('player')) document.getElementById('player').volume = \(volume)")
+        
+        if let time = seekTime {
+            nsView.evaluateJavaScript("if(document.getElementById('player')) { document.getElementById('player').currentTime = \(time); window.webkit.messageHandlers.time.postMessage(\(time)); }")
+            DispatchQueue.main.async {
+                self.seekTime = nil
+            }
+        }
+    }
+    
+    func seek(to time: Double, in nsView: WKWebView) {
+        nsView.evaluateJavaScript("if(document.getElementById('player')) document.getElementById('player').currentTime = \(time)")
     }
     
     // 核心修复：暴力清理 Web 进程，防止音频残留
@@ -100,9 +119,7 @@ struct WebMPlayerView: NSViewRepresentable {
         }
         
         func webView(_ wv: WKWebView, didFinish n: WKNavigation!) {
-            wv.configuration.userContentController.add(self, name: "duration")
-            wv.configuration.userContentController.add(self, name: "time")
-            wv.configuration.userContentController.add(self, name: "ended")
+            // Handlers are already added in makeNSView to prevent crash
         }
         
         func webView(_ wv: WKWebView, didFail n: WKNavigation!, withError e: Error) {

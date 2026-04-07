@@ -88,6 +88,14 @@ struct LocalizedString {
     static let rotateLeft = "向左旋转90度"
     static let rotateRight = "向右旋转90度"
     static let resetView = "重置画面"
+    static let version = "版本"
+    static let update = "更新"
+    static let currentVersion = "当前版本"
+    static let autoCheckUpdate = "自动检测更新"
+    static let checkForUpdates = "检测更新"
+    static let updateAvailable = "发现新版本"
+    static let viewOnGitHub = "在 GitHub 查看"
+    static let upToDate = "已是最新版本"
 }
 
 struct LocalizedString_en {
@@ -113,4 +121,12 @@ struct LocalizedString_en {
     static let rotateLeft = "Rotate Left 90°"
     static let rotateRight = "Rotate Right 90°"
     static let resetView = "Reset View"
+    static let version = "Version"
+    static let update = "Update"
+    static let currentVersion = "Current Version"
+    static let autoCheckUpdate = "Auto Check for Updates"
+    static let checkForUpdates = "Check for Updates"
+    static let updateAvailable = "Update Available"
+    static let viewOnGitHub = "View on GitHub"
+    static let upToDate = "Up to Date"
 }
