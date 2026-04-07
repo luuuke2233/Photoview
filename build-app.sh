@@ -42,9 +42,9 @@ cat > "$APP_DIR/Contents/Info.plist" << 'PLIST'
     <key>CFBundleIdentifier</key>
     <string>com.photoview.app</string>
     <key>CFBundleVersion</key>
-    <string>1.0.6-beta</string>
+    <string>1.0.11-beta</string>
     <key>CFBundleShortVersionString</key>
-    <string>1.0.6-beta</string>
+    <string>1.0.11-beta</string>
     <key>CFBundleExecutable</key>
     <string>PhotoView</string>
     <key>CFBundlePackageType</key>

@@ -128,7 +128,10 @@ struct FullscreenViewer: View {
                         
                         Spacer()
                         
-                        if scale != 1.0 || imageOffset != .zero || rotation != 0 || videoScale != 1.0 || videoOffset != .zero || videoRotation != 0 {
+                        let imageNeedsReset = scale != 1.0 || imageOffset != .zero || (rotation.truncatingRemainder(dividingBy: 360) != 0)
+                        let videoNeedsReset = videoScale != 1.0 || videoOffset != .zero || (videoRotation.truncatingRemainder(dividingBy: 360) != 0)
+                        
+                        if imageNeedsReset || videoNeedsReset {
                             Button(action: {
                                 resetScale()
                                 resetVideoView()
@@ -353,12 +356,10 @@ struct FullscreenViewer: View {
     }
     
     private func resetVideoView() {
-        withAnimation { 
-            videoScale = 1.0
-            videoOffset = .zero
-            lastVideoDragOffset = .zero
-            videoRotation = 0
-        }
+        videoScale = 1.0
+        videoOffset = .zero
+        lastVideoDragOffset = .zero
+        videoRotation = 0
     }
     
     private var videoMagnificationGesture: some Gesture {
@@ -376,12 +377,10 @@ struct FullscreenViewer: View {
     }
     
     private func resetScale() {
-        withAnimation { 
-            scale = 1.0
-            imageOffset = .zero
-            lastDragOffset = .zero
-            rotation = 0
-        }
+        scale = 1.0
+        imageOffset = .zero
+        lastDragOffset = .zero
+        rotation = 0
     }
 }
 
