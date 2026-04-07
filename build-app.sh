@@ -5,7 +5,7 @@ PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
 APP_DIR="$PROJECT_DIR/PhotoView.app"
 ICON_DIR="$PROJECT_DIR/icon.iconset"
 
-BETA_VERSION="1.5.3"
+BETA_VERSION="1.5.3-beta1"
 
 echo "=== Building PhotoView ==="
 swift build -c release --package-path "$PROJECT_DIR"

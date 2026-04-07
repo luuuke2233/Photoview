@@ -234,13 +234,50 @@ class LibraryManager: ObservableObject {
     private func saveFolders() {
         let bookmarks = rootFolders.compactMap { try? $0.url.bookmarkData(options: .withSecurityScope, includingResourceValuesForKeys: nil, relativeTo: nil) }
         UserDefaults.standard.set(bookmarks, forKey: "SavedFolderBookmarks")
+        
+        let folderStructures = rootFolders.map { folderToStruct($0) }
+        if let data = try? JSONEncoder().encode(folderStructures) {
+            UserDefaults.standard.set(data, forKey: "SavedFolderStructures")
+        }
+    }
+    
+    private struct FolderStruct: Codable {
+        let id: String
+        let name: String
+        let isScanned: Bool
+        let children: [FolderStruct]
+    }
+    
+    private func folderToStruct(_ node: FolderNode) -> FolderStruct {
+        FolderStruct(
+            id: node.id.uuidString,
+            name: node.name,
+            isScanned: node.isScanned,
+            children: node.children.map { folderToStruct($0) }
+        )
+    }
+    
+    private func folderFromStruct(_ struct_: FolderStruct, url: URL) -> FolderNode {
+        var node = FolderNode(id: UUID(uuidString: struct_.id) ?? UUID(), url: url, name: struct_.name)
+        node.isScanned = struct_.isScanned
+        node.children = struct_.children.map { childStruct in
+            let childURL = url.appendingPathComponent(childStruct.name)
+            return folderFromStruct(childStruct, url: childURL)
+        }
+        return node
     }
     
     // 优化：优先加载选中的文件夹，后台加载其他文件夹
     private func loadFolders() async {
         guard let savedBookmarks = UserDefaults.standard.array(forKey: "SavedFolderBookmarks") as? [Data] else { return }
+        
+        var savedStructures: [FolderStruct] = []
+        if let data = UserDefaults.standard.data(forKey: "SavedFolderStructures") {
+            savedStructures = (try? JSONDecoder().decode([FolderStruct].self, from: data)) ?? []
+        }
+        
         var loadedFolders: [FolderNode] = []
-        for data in savedBookmarks {
+        for (index, data) in savedBookmarks.enumerated() {
             var isStale = false
             do {
                 let url = try URL(resolvingBookmarkData: data, options: .withSecurityScope, bookmarkDataIsStale: &isStale)
@@ -251,14 +288,30 @@ class LibraryManager: ObservableObject {
                         isAvailable = FileManager.default.fileExists(atPath: newURL.path)
                         if isAvailable {
                             let acc = newURL.startAccessingSecurityScopedResource()
-                            if acc { loadedFolders.append(FolderNode(id: UUID(), url: newURL, name: newURL.lastPathComponent, isAvailable: true)) }
+                            if acc {
+                                let node: FolderNode
+                                if index < savedStructures.count {
+                                    node = folderFromStruct(savedStructures[index], url: newURL)
+                                } else {
+                                    node = FolderNode(id: UUID(), url: newURL, name: newURL.lastPathComponent, isAvailable: true)
+                                }
+                                loadedFolders.append(node)
+                            }
                             continue
                         }
                     }
                 }
                 if isAvailable {
                     let acc = url.startAccessingSecurityScopedResource()
-                    if acc { loadedFolders.append(FolderNode(id: UUID(), url: url, name: url.lastPathComponent, isAvailable: true)) }
+                    if acc {
+                        let node: FolderNode
+                        if index < savedStructures.count {
+                            node = folderFromStruct(savedStructures[index], url: url)
+                        } else {
+                            node = FolderNode(id: UUID(), url: url, name: url.lastPathComponent, isAvailable: true)
+                        }
+                        loadedFolders.append(node)
+                    }
                 } else {
                     loadedFolders.append(FolderNode(id: UUID(), url: url, name: url.lastPathComponent, isAvailable: false))
                 }
@@ -268,19 +321,15 @@ class LibraryManager: ObservableObject {
         if let f = rootFolders.first { 
             selectedRootFolder = f; 
             selectedFolder = f 
-            // 优先立即加载选中的文件夹
-            Task {
-                await priorityScanFolder(folderId: f.id)
-                self.resetAndLoadItems()
-            }
+            resetAndLoadItems()
         }
         
-        // 后台加载其他文件夹
+        // 后台扫描未扫描的文件夹
         Task {
             await withTaskGroup(of: (UUID, FolderNode).self) { group in
-                for var node in rootFolders where node.isAvailable && node.id != selectedRootFolder?.id {
+                for var node in rootFolders where node.isAvailable && !node.isScanned {
                     group.addTask {
-                        await self.scanFolderInternal(&node)
+                        await self.scanStructure(node: &node)
                         return (node.id, node)
                     }
                 }
