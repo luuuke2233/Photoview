@@ -1,7 +1,7 @@
 import SwiftUI
 import AppKit
 
-let appVersion = "1.5.0-beta.4"
+let appVersion = "1.5.0-beta.5"
 
 func zoomWindow() {
     if let window = NSApp.keyWindow {
@@ -148,11 +148,47 @@ struct CustomToolbar: View {
                     Image(systemName: "square.grid.2x2")
                 }
                 .help("View Mode")
+                
+            case .folderInfo:
+                folderInfoView
             }
         }
         .padding(6)
         .background(Color(nsColor: .controlBackgroundColor).opacity(0.5))
         .cornerRadius(6)
+    }
+    
+    @ViewBuilder
+    private var folderInfoView: some View {
+        let imageCount = lib.filteredItems.filter { $0.type == .image }.count
+        let videoCount = lib.filteredItems.filter { $0.type == .video }.count
+        let totalSize = lib.filteredItems.reduce(0) { $0 + $1.fileSize }
+        
+        HStack(spacing: 4) {
+            if imageCount > 0 {
+                HStack(spacing: 2) {
+                    Image(systemName: "photo")
+                    Text("\(imageCount)")
+                }
+            }
+            if videoCount > 0 {
+                HStack(spacing: 2) {
+                    Image(systemName: "video")
+                    Text("\(videoCount)")
+                }
+            }
+            if totalSize > 0 {
+                Text(formatFileSize(totalSize))
+            }
+        }
+        .font(.caption)
+        .foregroundColor(.secondary)
+    }
+    
+    private func formatFileSize(_ bytes: Int64) -> String {
+        let formatter = ByteCountFormatter()
+        formatter.countStyle = .file
+        return formatter.string(fromByteCount: bytes)
     }
 }
 
@@ -234,6 +270,7 @@ struct ToolbarCustomizationPanel: View {
         case .filter: return localization.tr(LocalizedString.filter, LocalizedString_en.filter)
         case .sort: return localization.tr(LocalizedString.sort, LocalizedString_en.sort)
         case .viewMode: return "View Mode"
+        case .folderInfo: return "Folder Info"
         }
     }
 }
@@ -310,9 +347,6 @@ struct FolderRow: View {
                     HStack {
                         Image(systemName: "folder.fill").foregroundColor(node.isAvailable ? .blue : .gray)
                         Text(node.name).foregroundColor(node.isAvailable ? .primary : .gray).lineLimit(1)
-                        if node.mediaCount > 0 {
-                            Text("(\(node.mediaCount))").font(.caption).foregroundColor(.secondary)
-                        }
                         Spacer()
                         if isRoot {
                             Button(action: { lib.removeFolder(node) }) {

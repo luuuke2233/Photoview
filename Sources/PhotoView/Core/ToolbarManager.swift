@@ -6,6 +6,7 @@ enum ToolbarItemType: String, CaseIterable, Codable, Identifiable {
     case filter = "filter"
     case sort = "sort"
     case viewMode = "viewMode"
+    case folderInfo = "folderInfo"
     
     var id: String { rawValue }
     
@@ -16,6 +17,7 @@ enum ToolbarItemType: String, CaseIterable, Codable, Identifiable {
         case .filter: return "line.3.horizontal.decrease.circle"
         case .sort: return "arrow.up.arrow.down"
         case .viewMode: return "square.grid.2x2"
+        case .folderInfo: return "info.circle"
         }
     }
     
@@ -25,7 +27,7 @@ enum ToolbarItemType: String, CaseIterable, Codable, Identifiable {
     
     var isBuiltIn: Bool {
         switch self {
-        case .refresh, .addFolder, .filter, .sort: return true
+        case .refresh, .addFolder, .filter, .sort, .folderInfo: return true
         case .viewMode: return false
         }
     }
