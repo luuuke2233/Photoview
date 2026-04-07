@@ -68,20 +68,24 @@ class LibraryManager: ObservableObject {
         }
     }
     
-    func addFolder(url: URL) {
+    func addFolder(url: URL) async {
         guard !rootFolders.contains(where: { $0.url == url }) else { return }
         let acc = url.startAccessingSecurityScopedResource()
         defer { if acc { url.stopAccessingSecurityScopedResource() } }
         
-        let node = FolderNode(id: UUID(), url: url, name: url.lastPathComponent)
-        rootFolders.append(node)
-        saveFolders()
+        var node = FolderNode(id: UUID(), url: url, name: url.lastPathComponent)
+        await scanFolderInternal(&node)
         
-        selectedRootFolder = node
-        selectedFolder = node
-        currentWatchedFolderId = node.id
-        Task { await scanAndLoadLevel(node: node) }
-        startWatching(folder: node)
+        await MainActor.run {
+            rootFolders.append(node)
+            saveFolders()
+            
+            selectedRootFolder = node
+            selectedFolder = node
+            currentWatchedFolderId = node.id
+            resetAndLoadItems()
+            startWatching(folder: node)
+        }
     }
     
     func removeFolder(_ node: FolderNode) {
@@ -388,6 +392,12 @@ class LibraryManager: ObservableObject {
     }
     
     private func scanStructure(node: inout FolderNode) async {
+        await scanStructureRecursive(node: &node, depth: 0, maxDepth: 10)
+    }
+    
+    private func scanStructureRecursive(node: inout FolderNode, depth: Int, maxDepth: Int) async {
+        if depth >= maxDepth { return }
+        
         let acc = node.url.startAccessingSecurityScopedResource()
         defer { if acc { node.url.stopAccessingSecurityScopedResource() } }
         guard acc else { return }
@@ -397,7 +407,11 @@ class LibraryManager: ObservableObject {
             var subs: [FolderNode] = []
             for url in contents {
                 let res = try? url.resourceValues(forKeys: [.isDirectoryKey])
-                if res?.isDirectory == true { subs.append(FolderNode(id: UUID(), url: url, name: url.lastPathComponent)) }
+                if res?.isDirectory == true {
+                    var child = FolderNode(id: UUID(), url: url, name: url.lastPathComponent)
+                    await scanStructureRecursive(node: &child, depth: depth + 1, maxDepth: maxDepth)
+                    subs.append(child)
+                }
             }
             node.children = subs.sorted { $0.name < $1.name }
         } catch {}

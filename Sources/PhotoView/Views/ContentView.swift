@@ -89,7 +89,7 @@ struct ContentView: View {
                     .padding(.top, 52)
             }
         }
-        .fileImporter(isPresented: $showImporter, allowedContentTypes: [.folder], allowsMultipleSelection: true) { if case .success(let u) = $0 { u.forEach { lib.addFolder(url: $0) } } }
+        .fileImporter(isPresented: $showImporter, allowedContentTypes: [.folder], allowsMultipleSelection: true) { if case .success(let u) = $0 { for url in u { Task { await lib.addFolder(url: url) } } } }
         .frame(minWidth: 800, minHeight: 600)
     }
 }
@@ -356,7 +356,7 @@ struct FolderRow: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 4) {
-                if !node.isScanned || !node.children.isEmpty {
+                if !node.children.isEmpty {
                     Button(action: {
                         if expandedFolders.contains(node.id) { expandedFolders.remove(node.id) }
                         else {
