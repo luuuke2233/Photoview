@@ -34,7 +34,9 @@ class LibraryManager: ObservableObject {
     @Published var selectedRootFolder: FolderNode?
     @Published var selectedFolder: FolderNode?
     @Published var filteredItems: [MediaMetadata] = []
-    @Published var isLoading = false; @Published var progress: Double = 0.0
+    @Published var isLoading = false
+    @Published var isScanningFolder = false
+    @Published var progress: Double = 0.0
     @Published var sortOption: SortOption = .dateNewest
     @Published var filterOption: FilterOption = .all
     
@@ -70,22 +72,32 @@ class LibraryManager: ObservableObject {
     
     func addFolder(url: URL) async {
         guard !rootFolders.contains(where: { $0.url == url }) else { return }
+        
+        isScanningFolder = true
+        
         let acc = url.startAccessingSecurityScopedResource()
         defer { if acc { url.stopAccessingSecurityScopedResource() } }
         
         var node = FolderNode(id: UUID(), url: url, name: url.lastPathComponent)
-        await scanFolderInternal(&node)
         
-        await MainActor.run {
-            rootFolders.append(node)
-            saveFolders()
-            
-            selectedRootFolder = node
-            selectedFolder = node
-            currentWatchedFolderId = node.id
-            resetAndLoadItems()
-            startWatching(folder: node)
-        }
+        await scanStructureRecursive(node: &node, depth: 0, maxDepth: 10)
+        node.isScanned = true
+        
+        print("DEBUG: Scanned root folder: \(node.name), children: \(node.children.count)")
+        
+        rootFolders.append(node)
+        
+        print("DEBUG: Added to rootFolders, total: \(rootFolders.count)")
+        
+        isScanningFolder = false
+        
+        saveFolders()
+        
+        selectedRootFolder = node
+        selectedFolder = node
+        currentWatchedFolderId = node.id
+        resetAndLoadItems()
+        startWatching(folder: node)
     }
     
     func removeFolder(_ node: FolderNode) {
@@ -321,7 +333,7 @@ class LibraryManager: ObservableObject {
     }
     
     @MainActor func buildTree() async {
-        rootFolders = rootFolders.map { var n = $0; n.children = []; n.isScanned = false; n.mediaCount = 0; return n }
+        rootFolders = rootFolders.map { var n = $0; n.isScanned = false; n.mediaCount = 0; return n }
         if let f = rootFolders.first { selectedRootFolder = f; selectedFolder = f }
         resetAndLoadItems()
     }
@@ -381,18 +393,29 @@ class LibraryManager: ObservableObject {
     }
     
     private func updateNodeInTree(_ node: FolderNode) {
-        if let idx = rootFolders.firstIndex(where: { $0.id == node.id }) { rootFolders[idx] = node; return }
+        for i in 0..<rootFolders.count {
+            if rootFolders[i].id == node.id {
+                rootFolders[i] = node
+                return
+            }
+        }
         updateInChildren(&rootFolders, node)
     }
     private func updateInChildren(_ roots: inout [FolderNode], _ node: FolderNode) {
         for i in 0..<roots.count {
-            if let idx = roots[i].children.firstIndex(where: { $0.id == node.id }) { roots[i].children[idx] = node; return }
+            if roots[i].id == node.id {
+                roots[i] = node
+                return
+            }
+            if let idx = roots[i].children.firstIndex(where: { $0.id == node.id }) {
+                roots[i].children[idx] = node
+                return
+            }
             updateInChildren(&roots[i].children, node)
         }
     }
     
     private func scanStructure(node: inout FolderNode) async {
-        await scanStructureRecursive(node: &node, depth: 0, maxDepth: 10)
     }
     
     private func scanStructureRecursive(node: inout FolderNode, depth: Int, maxDepth: Int) async {

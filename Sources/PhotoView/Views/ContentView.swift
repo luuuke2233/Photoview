@@ -335,12 +335,26 @@ struct SidebarView: View {
     let emptyFolderTitle: String
     
     var body: some View {
-        List {
-            ForEach(lib.rootFolders) { root in
-                FolderRow(expandedFolders: $expandedFolders, node: root, isRoot: true, emptyFolderTitle: emptyFolderTitle)
+        ZStack {
+            List {
+                ForEach(lib.rootFolders) { root in
+                    FolderRow(expandedFolders: $expandedFolders, node: root, isRoot: true, emptyFolderTitle: emptyFolderTitle)
+                }
+            }
+            .listStyle(.sidebar)
+            
+            if lib.isScanningFolder {
+                VStack {
+                    ProgressView()
+                        .scaleEffect(0.8)
+                    Text("Scanning folder...")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color(nsColor: .windowBackgroundColor).opacity(0.9))
             }
         }
-        .listStyle(.sidebar)
     }
 }
 
