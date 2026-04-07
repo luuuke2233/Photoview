@@ -1,59 +1,53 @@
 import SwiftUI
 
-let appVersion = "1.4.0"
+let appVersion = "1.5.0-beta.1"
 
 struct ContentView: View {
     @EnvironmentObject var lib: LibraryManager
+    @StateObject private var toolbarManager = ToolbarManager.shared
     @State private var showImporter = false
     @State private var sidebarWidth: Double = 250
     @ObservedObject private var localization = LocalizationManager.shared
     
     var filterPickerWidth: CGFloat {
-        localization.currentLanguage == .english ? 220 : 180
+        localization.currentLanguage == .english ? 220 : 200
     }
     
     var body: some View {
         ZStack(alignment: .bottomLeading) {
-            HStack(spacing: 0) {
-                SidebarView(emptyFolderTitle: localization.tr(LocalizedString.emptyFolder, LocalizedString_en.emptyFolder))
-                    .frame(width: sidebarWidth, alignment: .leading)
+            VStack(spacing: 0) {
+                CustomToolbar(
+                    toolbarManager: toolbarManager,
+                    localization: localization,
+                    filterPickerWidth: filterPickerWidth,
+                    showImporter: $showImporter,
+                    refreshAction: { Task { await lib.refreshCurrentFolder() } }
+                )
+                .frame(height: 44)
+                .background(Color(nsColor: .windowBackgroundColor))
+                .overlay(alignment: .bottom) {
+                    Divider()
+                }
                 
-                Divider()
-                    .frame(width: 4)
-                    .background(Color.clear)
-                    .contentShape(Rectangle())
-                    .gesture(
-                        DragGesture()
-                            .onChanged { sidebarWidth = max(200, min(500, sidebarWidth + $0.translation.width)) }
-                            .onEnded { _ in }
-                    )
-                
-                MediaGridView()
-                    .frame(maxWidth: .infinity)
-                    .toolbar {
-                        ToolbarItem(placement: .primaryAction) { Button(action: {
-                            Task { await lib.refreshCurrentFolder() }
-                        }) {
-                            Image(systemName: "arrow.clockwise")
-                        }.help(localization.tr(LocalizedString.refresh, LocalizedString_en.refresh))}
-                        ToolbarItem(placement: .primaryAction) { Button(localization.tr(LocalizedString.addFolder, LocalizedString_en.addFolder), systemImage: "folder.badge.plus") { showImporter = true } }
-                        ToolbarItem(placement: .primaryAction) { 
-                            Picker(localization.tr(LocalizedString.filter, LocalizedString_en.filter), selection: $lib.filterOption) { 
-                                ForEach(FilterOption.allCases) { option in
-                                    Text(localization.filterName(option)).tag(option)
-                                }
-                            }.pickerStyle(.segmented).frame(width: filterPickerWidth) 
-                        }
-                        ToolbarItem(placement: .primaryAction) { 
-                            Picker(localization.tr(LocalizedString.sort, LocalizedString_en.sort), selection: $lib.sortOption) { 
-                                ForEach(SortOption.allCases) { option in
-                                    Text(localization.sortName(option)).tag(option)
-                                }
-                            }.pickerStyle(.menu) 
-                        }
-                    }
-                    .onChange(of: lib.sortOption) { _, _ in lib.refreshFilter() }
-                    .onChange(of: lib.filterOption) { _, _ in lib.refreshFilter() }
+                HStack(spacing: 0) {
+                    SidebarView(emptyFolderTitle: localization.tr(LocalizedString.emptyFolder, LocalizedString_en.emptyFolder))
+                        .frame(width: sidebarWidth, alignment: .leading)
+                    
+                    Divider()
+                        .frame(width: 4)
+                        .background(Color.clear)
+                        .contentShape(Rectangle())
+                        .gesture(
+                            DragGesture()
+                                .onChanged { sidebarWidth = max(200, min(500, sidebarWidth + $0.translation.width)) }
+                                .onEnded { _ in }
+                        )
+                    
+                    MediaGridView()
+                        .frame(maxWidth: .infinity)
+                        .onChange(of: lib.sortOption) { _, _ in lib.refreshFilter() }
+                        .onChange(of: lib.filterOption) { _, _ in lib.refreshFilter() }
+                }
             }
             
             Text("v\(appVersion)")
@@ -62,8 +56,198 @@ struct ContentView: View {
                 .padding(8)
                 .allowsHitTesting(false)
         }
+        .overlay(alignment: .top) {
+            if toolbarManager.isCustomizing {
+                ToolbarCustomizationPanel(toolbarManager: toolbarManager, localization: localization)
+                    .padding(.top, 52)
+            }
+        }
         .fileImporter(isPresented: $showImporter, allowedContentTypes: [.folder], allowsMultipleSelection: true) { if case .success(let u) = $0 { u.forEach { lib.addFolder(url: $0) } } }
         .frame(minWidth: 800, minHeight: 600)
+    }
+}
+
+struct CustomToolbar: View {
+    @EnvironmentObject var lib: LibraryManager
+    @ObservedObject var toolbarManager: ToolbarManager
+    @ObservedObject var localization: LocalizationManager
+    let filterPickerWidth: CGFloat
+    @Binding var showImporter: Bool
+    let refreshAction: () -> Void
+    @State private var draggingItem: ToolbarItem?
+    
+    var body: some View {
+        HStack(spacing: 16) {
+            ForEach(toolbarManager.items) { item in
+                toolbarItemView(for: item)
+            }
+            
+            Spacer()
+            
+            Button(action: { toolbarManager.isCustomizing.toggle() }) {
+                Image(systemName: "ellipsis.circle")
+            }
+            .buttonStyle(.plain)
+            .help("Customize Toolbar")
+        }
+        .padding(.horizontal, 16)
+        .contextMenu {
+            Button("Customize Toolbar...") {
+                toolbarManager.isCustomizing = true
+            }
+            Divider()
+            Button("Reset to Default") {
+                toolbarManager.resetToDefault()
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private func toolbarItemView(for item: ToolbarItem) -> some View {
+        Group {
+            switch item.type {
+            case .refresh:
+                Button(action: refreshAction) {
+                    Image(systemName: "arrow.clockwise")
+                }
+                .help(localization.tr(LocalizedString.refresh, LocalizedString_en.refresh))
+                
+            case .addFolder:
+                Button(action: { showImporter = true }) {
+                    Label(localization.tr(LocalizedString.addFolder, LocalizedString_en.addFolder), systemImage: "folder.badge.plus")
+                }
+                
+            case .filter:
+                Picker(localization.tr(LocalizedString.filter, LocalizedString_en.filter), selection: $lib.filterOption) {
+                    ForEach(FilterOption.allCases) { option in
+                        Text(localization.filterName(option)).tag(option)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .frame(width: filterPickerWidth)
+                
+            case .sort:
+                Picker(localization.tr(LocalizedString.sort, LocalizedString_en.sort), selection: $lib.sortOption) {
+                    ForEach(SortOption.allCases) { option in
+                        Text(localization.sortName(option)).tag(option)
+                    }
+                }
+                .pickerStyle(.menu)
+                
+            case .viewMode:
+                Button(action: {}) {
+                    Image(systemName: "square.grid.2x2")
+                }
+                .help("View Mode")
+            }
+        }
+        .padding(6)
+        .background(Color(nsColor: .controlBackgroundColor).opacity(0.5))
+        .cornerRadius(6)
+    }
+}
+
+struct ToolbarCustomizationPanel: View {
+    @ObservedObject var toolbarManager: ToolbarManager
+    @ObservedObject var localization: LocalizationManager
+    @State private var draggingItem: ToolbarItem?
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("Current Items:")
+                    .font(.headline)
+                Spacer()
+                Button("Done") {
+                    toolbarManager.isCustomizing = false
+                }
+            }
+            
+            ForEach(toolbarManager.items) { item in
+                HStack {
+                    Image(systemName: item.type.systemImage)
+                        .frame(width: 20)
+                    Text(itemTypeName(item.type))
+                    Spacer()
+                    Image(systemName: "line.3.horizontal")
+                        .foregroundColor(.secondary)
+                }
+                .padding(8)
+                .background(Color(nsColor: .controlBackgroundColor))
+                .cornerRadius(6)
+                .onDrag {
+                    draggingItem = item
+                    return NSItemProvider(object: item.id as NSString)
+                }
+                .onDrop(of: [.text], delegate: ToolbarItemDropDelegate(
+                    item: item,
+                    items: $toolbarManager.items,
+                    draggingItem: $draggingItem
+                ))
+                .contextMenu {
+                    Button("Remove") {
+                        toolbarManager.removeItem(item)
+                    }
+                }
+            }
+            
+            Divider()
+            
+            Text("Available Items:")
+                .font(.headline)
+            
+            ForEach(ToolbarItemType.allCases.filter { type in
+                !toolbarManager.items.contains { $0.type == type }
+            }) { type in
+                HStack {
+                    Image(systemName: type.systemImage)
+                        .frame(width: 20)
+                    Text(itemTypeName(type))
+                    Spacer()
+                    Button("Add") {
+                        toolbarManager.addItem(type)
+                    }
+                }
+                .padding(8)
+            }
+        }
+        .padding()
+        .frame(width: 280)
+        .background(Color(nsColor: .windowBackgroundColor))
+        .cornerRadius(12)
+        .shadow(radius: 8)
+    }
+    
+    private func itemTypeName(_ type: ToolbarItemType) -> String {
+        switch type {
+        case .refresh: return localization.tr(LocalizedString.refresh, LocalizedString_en.refresh)
+        case .addFolder: return localization.tr(LocalizedString.addFolder, LocalizedString_en.addFolder)
+        case .filter: return localization.tr(LocalizedString.filter, LocalizedString_en.filter)
+        case .sort: return localization.tr(LocalizedString.sort, LocalizedString_en.sort)
+        case .viewMode: return "View Mode"
+        }
+    }
+}
+
+struct ToolbarItemDropDelegate: DropDelegate {
+    let item: ToolbarItem
+    @Binding var items: [ToolbarItem]
+    @Binding var draggingItem: ToolbarItem?
+    
+    func performDrop(info: DropInfo) -> Bool {
+        draggingItem = nil
+        return true
+    }
+    
+    func dropEntered(info: DropInfo) {
+        guard let draggingItem = draggingItem,
+              draggingItem.id != item.id,
+              let fromIndex = items.firstIndex(where: { $0.id == draggingItem.id }),
+              let toIndex = items.firstIndex(where: { $0.id == item.id }) else { return }
+        
+        withAnimation {
+            items.move(fromOffsets: IndexSet(integer: fromIndex), toOffset: toIndex > fromIndex ? toIndex + 1 : toIndex)
+        }
     }
 }
 
