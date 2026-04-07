@@ -1,7 +1,7 @@
 import SwiftUI
 import AppKit
 
-let appVersion = "1.5.0-beta.5"
+let appVersion = "1.5.0-beta.6"
 
 func zoomWindow() {
     if let window = NSApp.keyWindow {
@@ -359,6 +359,11 @@ struct FolderRow: View {
                 .padding(.vertical, 4)
                 .background(isSelected ? Color.accentColor.opacity(0.2) : Color.clear)
                 .cornerRadius(4)
+                .contextMenu {
+                    Button("Show in Finder") {
+                        NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: node.url.path)
+                    }
+                }
             }
             
             if expandedFolders.contains(node.id) {
