@@ -36,10 +36,12 @@ class LibraryManager: ObservableObject {
     @Published var filteredItems: [MediaMetadata] = []
     @Published var isLoading = false
     @Published var isScanningFolder = false
+    @Published var scanningFolderName = ""
     @Published var progress: Double = 0.0
     @Published var sortOption: SortOption = .dateNewest
     @Published var filterOption: FilterOption = .all
     
+    private var scanningTask: Task<Void, Never>?
     private let thumbnailCache = NSCache<NSString, NSImage>()
     private var db: OpaquePointer?
     private let pageSize = 200
@@ -74,30 +76,40 @@ class LibraryManager: ObservableObject {
         guard !rootFolders.contains(where: { $0.url == url }) else { return }
         
         isScanningFolder = true
+        scanningFolderName = url.lastPathComponent
         
         let acc = url.startAccessingSecurityScopedResource()
         defer { if acc { url.stopAccessingSecurityScopedResource() } }
         
         var node = FolderNode(id: UUID(), url: url, name: url.lastPathComponent)
         
-        await scanStructureRecursive(node: &node, depth: 0, maxDepth: 10)
-        node.isScanned = true
+        scanningTask = Task {
+            await scanStructureRecursive(node: &node, depth: 0, maxDepth: 10)
+            node.isScanned = true
+            
+            if !Task.isCancelled {
+                await MainActor.run {
+                    rootFolders.append(node)
+                    self.isScanningFolder = false
+                    self.scanningFolderName = ""
+                    self.saveFolders()
+                    self.selectedRootFolder = node
+                    self.selectedFolder = node
+                    self.currentWatchedFolderId = node.id
+                    self.resetAndLoadItems()
+                    self.startWatching(folder: node)
+                }
+            }
+        }
         
-        print("DEBUG: Scanned root folder: \(node.name), children: \(node.children.count)")
-        
-        rootFolders.append(node)
-        
-        print("DEBUG: Added to rootFolders, total: \(rootFolders.count)")
-        
+        await scanningTask?.value
+    }
+    
+    func cancelScanFolder() {
+        scanningTask?.cancel()
+        scanningTask = nil
         isScanningFolder = false
-        
-        saveFolders()
-        
-        selectedRootFolder = node
-        selectedFolder = node
-        currentWatchedFolderId = node.id
-        resetAndLoadItems()
-        startWatching(folder: node)
+        scanningFolderName = ""
     }
     
     func removeFolder(_ node: FolderNode) {

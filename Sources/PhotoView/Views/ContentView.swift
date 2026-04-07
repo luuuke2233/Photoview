@@ -344,12 +344,18 @@ struct SidebarView: View {
             .listStyle(.sidebar)
             
             if lib.isScanningFolder {
-                VStack {
+                VStack(spacing: 8) {
                     ProgressView()
                         .scaleEffect(0.8)
-                    Text("Scanning folder...")
+                    Text("正在加载: \(lib.scanningFolderName)")
                         .font(.caption)
                         .foregroundColor(.secondary)
+                    Button(action: { lib.cancelScanFolder() }) {
+                        Text("停止加载")
+                            .font(.caption)
+                            .foregroundColor(.red)
+                    }
+                    .buttonStyle(.plain)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(Color(nsColor: .windowBackgroundColor).opacity(0.9))
