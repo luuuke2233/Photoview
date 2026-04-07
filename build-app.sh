@@ -2,10 +2,10 @@
 set -e
 
 PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
-APP_DIR="$PROJECT_DIR/PhotoView-beta.app"
+APP_DIR="$PROJECT_DIR/PhotoView.app"
 ICON_PNG="$PROJECT_DIR/icon.png"
 
-echo "=== Building PhotoView Beta ==="
+echo "=== Building PhotoView ==="
 swift build -c release --package-path "$PROJECT_DIR"
 
 echo "=== Creating .app bundle ==="
@@ -38,13 +38,13 @@ cat > "$APP_DIR/Contents/Info.plist" << 'PLIST'
     <key>CFBundleName</key>
     <string>PhotoView</string>
     <key>CFBundleDisplayName</key>
-    <string>PhotoView Beta</string>
+    <string>PhotoView</string>
     <key>CFBundleIdentifier</key>
     <string>com.photoview.app</string>
     <key>CFBundleVersion</key>
-    <string>1.0.11-beta</string>
+    <string>1.5.2</string>
     <key>CFBundleShortVersionString</key>
-    <string>1.0.11-beta</string>
+    <string>1.5.2</string>
     <key>CFBundleExecutable</key>
     <string>PhotoView</string>
     <key>CFBundlePackageType</key>
@@ -59,4 +59,4 @@ cat > "$APP_DIR/Contents/Info.plist" << 'PLIST'
 </plist>
 PLIST
 
-echo "=== Done! Beta app created at $APP_DIR ==="
+echo "=== Done! App created at $APP_DIR ==="
