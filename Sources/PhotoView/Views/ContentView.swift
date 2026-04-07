@@ -1,6 +1,13 @@
 import SwiftUI
+import AppKit
 
-let appVersion = "1.5.0-beta.1"
+let appVersion = "1.5.0-beta.4"
+
+func zoomWindow() {
+    if let window = NSApp.keyWindow {
+        window.zoom(nil)
+    }
+}
 
 struct ContentView: View {
     @EnvironmentObject var lib: LibraryManager
@@ -25,6 +32,9 @@ struct ContentView: View {
                 )
                 .frame(height: 44)
                 .background(Color(nsColor: .windowBackgroundColor))
+                .onTapGesture(count: 2) {
+                    zoomWindow()
+                }
                 .overlay(alignment: .bottom) {
                     Divider()
                 }
@@ -74,7 +84,6 @@ struct CustomToolbar: View {
     let filterPickerWidth: CGFloat
     @Binding var showImporter: Bool
     let refreshAction: () -> Void
-    @State private var draggingItem: ToolbarItem?
     
     var body: some View {
         HStack(spacing: 16) {
