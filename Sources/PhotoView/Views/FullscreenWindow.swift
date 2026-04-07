@@ -48,6 +48,13 @@ struct FullscreenViewer: View {
     @State private var lastScale: CGFloat = 1.0
     @State private var imageOffset: CGSize = .zero
     @State private var lastDragOffset: CGSize = .zero
+    @State private var rotation: Double = 0
+    @State private var webMSeekTime: Double?
+    @State private var videoScale: CGFloat = 1.0
+    @State private var lastVideoScale: CGFloat = 1.0
+    @State private var videoOffset: CGSize = .zero
+    @State private var lastVideoDragOffset: CGSize = .zero
+    @State private var videoRotation: Double = 0
     @ObservedObject private var localization = LocalizationManager.shared
     
     var exitFullscreenTitle: String {
@@ -76,6 +83,7 @@ struct FullscreenViewer: View {
                         .resizable()
                         .scaledToFit()
                         .scaleEffect(scale)
+                        .rotationEffect(.degrees(rotation))
                         .offset(imageOffset)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .padding(.vertical, 1)
@@ -88,12 +96,22 @@ struct FullscreenViewer: View {
                             }
                         }
                 } else if isWebM {
-                    WebMVideoPlayerView(url: currentItem.url, isPlaying: $isPlaying, currentTime: $currentTime, duration: $duration, volume: $volume, onEnded: { goNext() }, key: playerKey)
+                    WebMVideoPlayerView(url: currentItem.url, isPlaying: $isPlaying, currentTime: $currentTime, duration: $duration, volume: $volume, onEnded: { goNext() }, key: playerKey, seekTime: $webMSeekTime)
                         .frame(maxWidth: .infinity, maxHeight: .infinity).padding(.vertical, 1)
+                        .scaleEffect(videoScale)
+                        .rotationEffect(.degrees(videoRotation))
+                        .offset(videoOffset)
+                        .gesture(videoMagnificationGesture)
+                        .gesture(videoDragGesture)
                 } else if let avPlayer {
                     AVPlayerLayerView(player: avPlayer)
                         .frame(maxWidth: .infinity, maxHeight: .infinity).padding(.vertical, 1)
                         .id(currentItem.id)
+                        .scaleEffect(videoScale)
+                        .rotationEffect(.degrees(videoRotation))
+                        .offset(videoOffset)
+                        .gesture(videoMagnificationGesture)
+                        .gesture(videoDragGesture)
                 }
                 
                 VStack {
@@ -110,17 +128,53 @@ struct FullscreenViewer: View {
                         
                         Spacer()
                         
-                        if scale != 1.0 || imageOffset != .zero {
-                            Button(action: resetScale) {
+                        if scale != 1.0 || imageOffset != .zero || rotation != 0 || videoScale != 1.0 || videoOffset != .zero || videoRotation != 0 {
+                            Button(action: {
+                                resetScale()
+                                resetVideoView()
+                            }) {
                                 Image(systemName: "arrow.counterclockwise")
                                     .font(.title2).foregroundColor(.white)
-                            }.buttonStyle(.plain).padding().help(localization.tr(LocalizedString.resetZoom, LocalizedString_en.resetZoom))
+                            }.buttonStyle(.plain).padding().help(localization.tr(LocalizedString.resetView, LocalizedString_en.resetView))
+                        }
+                        
+                        if currentItem.type == .image {
+                            if rotation != 0 {
+                                Button(action: { withAnimation { rotation = 0 } }) {
+                                    Image(systemName: "rotate.left")
+                                        .font(.title2).foregroundColor(.white)
+                                }.buttonStyle(.plain).padding().help(localization.tr(LocalizedString.rotateLeft, LocalizedString_en.rotateLeft))
+                            } else {
+                                Button(action: { withAnimation { rotation += 90 } }) {
+                                    Image(systemName: "rotate.right")
+                                        .font(.title2).foregroundColor(.white)
+                                }.buttonStyle(.plain).padding().help(localization.tr(LocalizedString.rotateRight, LocalizedString_en.rotateRight))
+                            }
+                        } else if currentItem.type == .video {
+                            if videoRotation != 0 {
+                                Button(action: { withAnimation { videoRotation = 0 } }) {
+                                    Image(systemName: "rotate.left")
+                                        .font(.title2).foregroundColor(.white)
+                                }.buttonStyle(.plain).padding().help(localization.tr(LocalizedString.rotateLeft, LocalizedString_en.rotateLeft))
+                            } else {
+                                Button(action: { withAnimation { videoRotation += 90 } }) {
+                                    Image(systemName: "rotate.right")
+                                        .font(.title2).foregroundColor(.white)
+                                }.buttonStyle(.plain).padding().help(localization.tr(LocalizedString.rotateRight, LocalizedString_en.rotateRight))
+                            }
                         }
                     }
                     Spacer()
                     if showToolbar {
                         DraggableToolbar(isPlaying: $isPlaying, currentTime: $currentTime, duration: $duration, volume: $volume,
-                            player: avPlayer, onPrev: goPrev, onNext: goNext, offset: $toolbarOffset, isWebM: isWebM, scale: $scale)
+                            player: avPlayer, onPrev: goPrev, onNext: goNext, offset: $toolbarOffset, isWebM: isWebM, scale: $scale,
+                            onSeekWebM: { time in
+                                if isWebM {
+                                    webMSeekTime = time
+                                }
+                            }, onResetVideo: {
+                                resetVideoView()
+                            })
                             .padding(.bottom, 40)
                     }
                 }
@@ -131,6 +185,12 @@ struct FullscreenViewer: View {
             lastScale = 1.0
             imageOffset = .zero
             lastDragOffset = .zero
+            rotation = 0
+            videoScale = 1.0
+            lastVideoScale = 1.0
+            videoOffset = .zero
+            lastVideoDragOffset = .zero
+            videoRotation = 0
             actions.cleanup = { cleanupPlayer() }
             setupMedia()
             actions.goPrev = { goPrev() }; actions.goNext = { goNext() }
@@ -224,6 +284,12 @@ struct FullscreenViewer: View {
         lastScale = 1.0
         imageOffset = .zero
         lastDragOffset = .zero
+        rotation = 0
+        videoScale = 1.0
+        lastVideoScale = 1.0
+        videoOffset = .zero
+        lastVideoDragOffset = .zero
+        videoRotation = 0
         
         if n.type == .image {
             avPlayer = nil; image = nil; loadImg(url: n.url)
@@ -275,11 +341,50 @@ struct FullscreenViewer: View {
             }
     }
     
+    private var videoDragGesture: some Gesture {
+        DragGesture()
+            .onChanged { value in
+                if videoScale > 1.0 {
+                    videoOffset = CGSize(
+                        width: lastVideoDragOffset.width + value.translation.width,
+                        height: lastVideoDragOffset.height + value.translation.height
+                    )
+                }
+            }
+            .onEnded { value in
+                lastVideoDragOffset = videoOffset
+            }
+    }
+    
+    private func resetVideoView() {
+        withAnimation { 
+            videoScale = 1.0
+            videoOffset = .zero
+            lastVideoDragOffset = .zero
+            videoRotation = 0
+        }
+    }
+    
+    private var videoMagnificationGesture: some Gesture {
+        MagnificationGesture()
+            .onChanged { value in
+                let delta = value / lastVideoScale
+                videoScale = max(0.5, min(5.0, videoScale * delta))
+                lastVideoScale = value
+            }
+            .onEnded { _ in
+                lastVideoScale = 1.0
+                if videoScale < 0.5 { videoScale = 0.5 }
+                if videoScale > 5.0 { videoScale = 5.0 }
+            }
+    }
+    
     private func resetScale() {
         withAnimation { 
             scale = 1.0
             imageOffset = .zero
             lastDragOffset = .zero
+            rotation = 0
         }
     }
 }
@@ -292,9 +397,10 @@ struct WebMVideoPlayerView: View {
     @Binding var volume: Double
     let onEnded: () -> Void
     let key: UUID
+    @Binding var seekTime: Double?
     
     var body: some View {
-        WebMPlayerView(url: url, isPlaying: $isPlaying, currentTime: $currentTime, duration: $duration, volume: $volume, onEnded: onEnded)
+        WebMPlayerView(url: url, isPlaying: $isPlaying, currentTime: $currentTime, duration: $duration, volume: $volume, seekTime: $seekTime, onEnded: onEnded)
             .id(key)
     }
 }
@@ -304,6 +410,8 @@ struct DraggableToolbar: View {
     let player: AVPlayer?; let onPrev: () -> Void; let onNext: () -> Void; @Binding var offset: CGSize
     let isWebM: Bool
     @Binding var scale: CGFloat
+    var onSeekWebM: ((Double) -> Void)?
+    var onResetVideo: (() -> Void)?
     
     var body: some View {
         HStack(spacing: 16) {
@@ -317,7 +425,11 @@ struct DraggableToolbar: View {
             
             Slider(value: Binding(get: { currentTime }, set: { newTime in
                 currentTime = newTime
-                if !isWebM { player?.seek(to: CMTime(seconds: newTime, preferredTimescale: 600)) }
+                if isWebM {
+                    onSeekWebM?(newTime)
+                } else {
+                    player?.seek(to: CMTime(seconds: newTime, preferredTimescale: 600))
+                }
             }), in: 0...max(duration, 1)).frame(width: 200).accentColor(.white)
             
             Text(formatTime(duration)).foregroundColor(.white).font(.caption).frame(width: 40, alignment: .leading)
@@ -325,12 +437,15 @@ struct DraggableToolbar: View {
             Image(systemName: "speaker.wave.3.fill").foregroundColor(.white)
             Slider(value: $volume, in: 0...1)
                 .frame(width: 80).accentColor(.white)
-                .onChange(of: volume) { _, newValue in
-                    player?.volume = Float(newValue)
-                }
             
-            if scale != 1.0 {
-                Button(action: { withAnimation { scale = 1.0 } }) {
+            if scale != 1.0 || onResetVideo != nil {
+                Button(action: { 
+                    if let reset = onResetVideo {
+                        reset()
+                    } else {
+                        withAnimation { scale = 1.0 }
+                    }
+                }) {
                     Image(systemName: "arrow.counterclockwise")
                         .font(.title2)
                 }.buttonStyle(.plain)

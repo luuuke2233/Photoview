@@ -85,6 +85,9 @@ struct LocalizedString {
     static let showInFinder = "在 Finder 中显示"
     static let exitFullscreen = "退出全屏并关闭窗口"
     static let resetZoom = "重置缩放"
+    static let rotateLeft = "向左旋转90度"
+    static let rotateRight = "向右旋转90度"
+    static let resetView = "重置画面"
 }
 
 struct LocalizedString_en {
@@ -107,4 +110,7 @@ struct LocalizedString_en {
     static let showInFinder = "Show in Finder"
     static let exitFullscreen = "Exit fullscreen"
     static let resetZoom = "Reset Zoom"
+    static let rotateLeft = "Rotate Left 90°"
+    static let rotateRight = "Rotate Right 90°"
+    static let resetView = "Reset View"
 }
