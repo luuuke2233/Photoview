@@ -1,7 +1,7 @@
 import SwiftUI
 import AppKit
 
-let appVersion = "1.5.0-beta.8"
+let appVersion = "1.5.0-beta.9"
 
 struct ToolbarButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
@@ -78,7 +78,7 @@ struct ContentView: View {
                                 .onEnded { _ in }
                         )
                     
-                    MediaGridView()
+                    MediaGridView(viewMode: toolbarManager.currentViewMode)
                         .frame(maxWidth: .infinity)
                         .onChange(of: lib.sortOption) { _, _ in lib.refreshFilter() }
                         .onChange(of: lib.filterOption) { _, _ in lib.refreshFilter() }
@@ -171,9 +171,23 @@ struct CustomToolbar: View {
                 .pickerStyle(.menu)
                 
             case .viewMode:
-                Button(action: {}) {
-                    Image(systemName: "square.grid.2x2")
+                Menu {
+                    ForEach(ViewMode.allCases) { mode in
+                        Button(action: { toolbarManager.currentViewMode = mode }) {
+                            HStack {
+                                Image(systemName: mode.systemImage)
+                                Text(mode.title)
+                                if toolbarManager.currentViewMode == mode {
+                                    Image(systemName: "checkmark")
+                                }
+                            }
+                        }
+                    }
+                } label: {
+                    Image(systemName: toolbarManager.currentViewMode.systemImage)
                 }
+                .menuStyle(.borderlessButton)
+                .fixedSize()
                 .buttonStyle(ToolbarButtonStyle())
                 .help("View Mode")
                 

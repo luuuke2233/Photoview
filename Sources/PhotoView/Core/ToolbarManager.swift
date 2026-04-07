@@ -1,5 +1,26 @@
 import Foundation
 
+enum ViewMode: String, CaseIterable, Codable, Identifiable {
+    case grid = "grid"
+    case list = "list"
+    
+    var id: String { rawValue }
+    
+    var systemImage: String {
+        switch self {
+        case .grid: return "square.grid.2x2"
+        case .list: return "list.bullet"
+        }
+    }
+    
+    var title: String {
+        switch self {
+        case .grid: return "Grid"
+        case .list: return "List"
+        }
+    }
+}
+
 enum ToolbarItemType: String, CaseIterable, Codable, Identifiable {
     case refresh = "refresh"
     case addFolder = "addFolder"
@@ -50,6 +71,7 @@ class ToolbarManager: ObservableObject {
     static let shared = ToolbarManager()
     
     private let userDefaultsKey = "toolbarItems"
+    private let viewModeKey = "viewMode"
     
     @Published var items: [ToolbarItem] = [] {
         didSet {
@@ -59,10 +81,20 @@ class ToolbarManager: ObservableObject {
     
     @Published var isCustomizing: Bool = false
     
+    @Published var currentViewMode: ViewMode = .grid {
+        didSet {
+            UserDefaults.standard.set(currentViewMode.rawValue, forKey: viewModeKey)
+        }
+    }
+    
     private init() {
         loadFromUserDefaults()
         if items.isEmpty {
             items = ToolbarItemType.allCases.filter { $0.isBuiltIn }.map { ToolbarItem(type: $0) }
+        }
+        if let modeRaw = UserDefaults.standard.string(forKey: viewModeKey),
+           let mode = ViewMode(rawValue: modeRaw) {
+            currentViewMode = mode
         }
     }
     
