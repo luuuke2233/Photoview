@@ -1,8 +1,7 @@
 import SwiftUI
 import WebKit
 
-/// WebM 视频播放器 - 使用 WKWebView 作为 AVPlayer 的降级方案
-struct WebMPlayerView: NSViewRepresentable {
+struct WebMPlayerView: View {
     let url: URL
     @Binding var isPlaying: Bool
     @Binding var currentTime: Double
@@ -10,6 +9,52 @@ struct WebMPlayerView: NSViewRepresentable {
     @Binding var volume: Double
     @Binding var seekTime: Double?
     let onEnded: () -> Void
+    let key: UUID
+    
+    var body: some View {
+        WebMPlayerViewImpl(url: url, isPlaying: $isPlaying, currentTime: $currentTime, duration: $duration, volume: $volume, seekTime: $seekTime, onEnded: onEnded, key: key)
+            .id(key)
+    }
+}
+
+struct WebMPlayerViewImpl: NSViewRepresentable {
+    let url: URL
+    @Binding var isPlaying: Bool
+    @Binding var currentTime: Double
+    @Binding var duration: Double
+    @Binding var volume: Double
+    @Binding var seekTime: Double?
+    let onEnded: () -> Void
+    let key: UUID
+    
+    private static var webViewStorage: [UUID: WKWebView] = [:]
+    
+    static func clearAllWebViews() {
+        for (_, webView) in webViewStorage {
+            webView.stopLoading()
+            webView.evaluateJavaScript("const v = document.getElementById('player'); if(v) { v.pause(); v.volume = 0; v.src = ''; v.load(); }")
+            webView.loadHTMLString("", baseURL: nil)
+        }
+        webViewStorage.removeAll()
+    }
+    
+    static func clearWebView(key: UUID) {
+        if let webView = webViewStorage[key] {
+            webView.stopLoading()
+            webView.evaluateJavaScript("const v = document.getElementById('player'); if(v) { v.pause(); v.volume = 0; v.src = ''; v.load(); }")
+            webView.loadHTMLString("", baseURL: nil)
+            webViewStorage.removeValue(forKey: key)
+        }
+    }
+    
+    static func forceStopAll() {
+        for (_, webView) in webViewStorage {
+            webView.stopLoading()
+            webView.configuration.userContentController.removeAllUserScripts()
+        }
+        webViewStorage.removeAll()
+    }
+    private var webViewKey: UUID { key }
     
     func makeNSView(context: Context) -> WKWebView {
         let config = WKWebViewConfiguration()
@@ -72,6 +117,8 @@ struct WebMPlayerView: NSViewRepresentable {
             try? FileManager.default.removeItem(at: htmlURL)
         }
         
+        WebMPlayerViewImpl.webViewStorage[webViewKey] = webView
+        
         return webView
     }
     
@@ -80,7 +127,7 @@ struct WebMPlayerView: NSViewRepresentable {
         if isPlaying {
             nsView.evaluateJavaScript("document.getElementById('player')?.play()")
         } else {
-            nsView.evaluateJavaScript("document.getElementById('player')?.pause()")
+            nsView.evaluateJavaScript("if(document.getElementById('player')) { document.getElementById('player').pause(); document.getElementById('player').volume = 0; }")
         }
         nsView.evaluateJavaScript("if(document.getElementById('player')) document.getElementById('player').volume = \(volume)")
         
@@ -92,22 +139,25 @@ struct WebMPlayerView: NSViewRepresentable {
         }
     }
     
-    func seek(to time: Double, in nsView: WKWebView) {
-        nsView.evaluateJavaScript("if(document.getElementById('player')) document.getElementById('player').currentTime = \(time)")
-    }
-    
-    // 核心修复：暴力清理 Web 进程，防止音频残留
     static func dismantleNSView(_ nsView: WKWebView, coordinator: Coordinator) {
         nsView.stopLoading()
-        nsView.evaluateJavaScript("const v = document.getElementById('player'); if(v) { v.pause(); v.src = ''; v.load(); }")
+        nsView.evaluateJavaScript("""
+            const v = document.getElementById('player');
+            if(v) {
+                v.pause();
+                v.volume = 0;
+                v.src = '';
+                v.load();
+            }
+        """)
         nsView.loadHTMLString("<html><body></body></html>", baseURL: nil)
     }
     
     func makeCoordinator() -> Coordinator { Coordinator(parent: self) }
     
     class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
-        let parent: WebMPlayerView
-        init(parent: WebMPlayerView) { self.parent = parent }
+        let parent: WebMPlayerViewImpl
+        init(parent: WebMPlayerViewImpl) { self.parent = parent }
         
         func userContentController(_ uc: WKUserContentController, didReceive m: WKScriptMessage) {
             switch m.name {
@@ -118,12 +168,10 @@ struct WebMPlayerView: NSViewRepresentable {
             }
         }
         
-        func webView(_ wv: WKWebView, didFinish n: WKNavigation!) {
-            // Handlers are already added in makeNSView to prevent crash
-        }
+        func webView(_ wv: WKWebView, didFinish n: WKNavigation!) {}
         
         func webView(_ wv: WKWebView, didFail n: WKNavigation!, withError e: Error) {
-            print("❌ WebM Load Failed: \(e.localizedDescription)")
+            print("WebM Load Failed: \(e.localizedDescription)")
         }
     }
 }

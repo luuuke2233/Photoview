@@ -12,18 +12,29 @@ import AppKit
     var exit: () -> Void = {}
     var close: () -> Void = {} // 用于关闭窗口
     var cleanup: () -> Void = {}
+    var cleanupWebM: (() -> Void)? = nil
+    var cleanupWebMForce: (() -> Void)? = nil
 }
 
 class FullscreenWindowDelegate: NSObject, NSWindowDelegate {
     let cleanup: () -> Void
     init(cleanup: @escaping () -> Void) { self.cleanup = cleanup }
-    func windowWillClose(_ notification: Notification) { cleanup() }
+    func windowWillClose(_ notification: Notification) {
+        DispatchQueue.main.async {
+            self.cleanup()
+        }
+    }
 }
 
 final class FullscreenWindow: NSWindow {
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { true }
     var keyHandler: ((NSEvent) -> NSEvent?)?
+    var onClose: (() -> Void)?
+    override func close() {
+        onClose?()
+        super.close()
+    }
     override func sendEvent(_ event: NSEvent) {
         if event.type == .keyDown { if let h = keyHandler, h(event) == nil { return } }
         super.sendEvent(event)
@@ -191,6 +202,12 @@ struct FullscreenViewer: View {
             lastVideoDragOffset = .zero
             videoRotation = 0
             actions.cleanup = { cleanupPlayer() }
+            actions.cleanupWebM = {
+                self.isPlaying = false
+            }
+            actions.cleanupWebMForce = {
+                WebMPlayerViewImpl.clearAllWebViews()
+            }
             setupMedia()
             actions.goPrev = { goPrev() }; actions.goNext = { goNext() }
             actions.seekUp = { seek(by: -0.05) }; actions.seekDown = { seek(by: 0.05) }
@@ -200,9 +217,16 @@ struct FullscreenViewer: View {
         .onDisappear { cleanupPlayer() }
     }
     
-    private func cleanupPlayer() {
+    private func cleanupPlayer(forceStop: Bool = false) {
         guard !isCleanedUp else { return }
         isCleanedUp = true
+        isPlaying = false
+        actions.cleanupWebM?()
+        
+        if forceStop {
+            WebMPlayerViewImpl.clearAllWebViews()
+            WebMPlayerViewImpl.forceStopAll()
+        }
         
         if let player = avPlayer {
             player.volume = 0
@@ -395,7 +419,7 @@ struct WebMVideoPlayerView: View {
     @Binding var seekTime: Double?
     
     var body: some View {
-        WebMPlayerView(url: url, isPlaying: $isPlaying, currentTime: $currentTime, duration: $duration, volume: $volume, seekTime: $seekTime, onEnded: onEnded)
+        WebMPlayerView(url: url, isPlaying: $isPlaying, currentTime: $currentTime, duration: $duration, volume: $volume, seekTime: $seekTime, onEnded: onEnded, key: key)
             .id(key)
     }
 }
@@ -473,17 +497,20 @@ struct AVPlayerLayerView: NSViewRepresentable {
 }
 
 @MainActor final class FullscreenWindowController {
-    static let shared = FullscreenWindowController(); private var win: FullscreenWindow?
+    static let shared = FullscreenWindowController()
+    private var win: FullscreenWindow?
+    private var actions: FullscreenActions?
     
     func show(item: MediaItem, in items: [MediaItem]) {
-        let actions = FullscreenActions()
+        let act = FullscreenActions()
+        actions = act
         
         // 核心修复：绑定关闭窗口的动作
-        actions.close = { [weak self] in
+        act.close = { [weak self] in
             self?.close()
         }
         
-        let viewer = FullscreenViewer(item: item, items: items, actions: actions)
+        let viewer = FullscreenViewer(item: item, items: items, actions: act)
         let hosting = NSHostingController(rootView: viewer)
         let w = FullscreenWindow(contentViewController: hosting)
         w.styleMask = [.titled, .closable, .fullSizeContentView, .resizable]
@@ -491,26 +518,37 @@ struct AVPlayerLayerView: NSViewRepresentable {
         w.level = .floating
         
         let delegate = FullscreenWindowDelegate {
-            Task { @MainActor in actions.cleanup() }
+            Task { @MainActor in self.actions?.cleanup() }
         }
         w.delegate = delegate
         
-        w.keyHandler = { event in
+        w.keyHandler = { [weak self] event in
             switch event.keyCode {
-            case 123: actions.goPrev(); return nil
-            case 124: actions.goNext(); return nil
-            case 126: actions.seekUp(); return nil
-            case 125: actions.seekDown(); return nil
-            case 49: actions.togglePlay(); return nil
-            case 53: actions.exit(); return nil
+            case 123: self?.actions?.goPrev(); return nil
+            case 124: self?.actions?.goNext(); return nil
+            case 126: self?.actions?.seekUp(); return nil
+            case 125: self?.actions?.seekDown(); return nil
+            case 49: self?.actions?.togglePlay(); return nil
+            case 53: self?.actions?.exit(); return nil
             default: return event
             }
         }
+        
+        w.onClose = { [weak self] in
+            self?.actions?.cleanup()
+            self?.actions?.cleanupWebMForce?()
+        }
+        
         if let s = NSScreen.main { w.setFrame(s.visibleFrame.insetBy(dx: 100, dy: 100), display: true) }
         w.makeKeyAndOrderFront(nil); win = w
     }
     
     func close() { 
+        if let act = actions {
+            Task { @MainActor in
+                act.cleanup()
+            }
+        }
         win?.close()
         win = nil 
     }
