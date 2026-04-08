@@ -1,7 +1,7 @@
 import SwiftUI
 import AppKit
 
-let appVersion = "1.5.4"
+let appVersion = "1.5.5"
 
 struct ToolbarButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
