@@ -178,7 +178,7 @@ struct FullscreenViewer: View {
                     Spacer()
                     if showToolbar {
                         DraggableToolbar(isPlaying: $isPlaying, currentTime: $currentTime, duration: $duration, volume: $volume,
-                            player: avPlayer, onPrev: goPrev, onNext: goNext, offset: $toolbarOffset, isWebM: isWebM, scale: $scale,
+                            player: avPlayer, onPrev: goPrev, onNext: goNext, offset: $toolbarOffset, isWebM: isWebM, isImage: currentItem.type == .image, scale: $scale,
                             onSeekWebM: { time in
                                 if isWebM {
                                     webMSeekTime = time
@@ -432,6 +432,7 @@ struct DraggableToolbar: View {
     @Binding var isPlaying: Bool; @Binding var currentTime: Double; @Binding var duration: Double; @Binding var volume: Double
     let player: AVPlayer?; let onPrev: () -> Void; let onNext: () -> Void; @Binding var offset: CGSize
     let isWebM: Bool
+    let isImage: Bool
     @Binding var scale: CGFloat
     var onSeekWebM: ((Double) -> Void)?
     var onVolumeChanged: ((Double) -> Void)?
@@ -441,35 +442,39 @@ struct DraggableToolbar: View {
     var body: some View {
         HStack(spacing: 16) {
             Button(action: onPrev) { Image(systemName: "backward.fill").font(.title2) }.buttonStyle(.plain)
-            Button(action: { isPlaying ? pauseAction() : playAction() }) {
-                Image(systemName: isPlaying ? "pause.fill" : "play.fill").font(.title)
-            }.buttonStyle(.plain)
-            Button(action: onNext) { Image(systemName: "forward.fill").font(.title2) }.buttonStyle(.plain)
             
-            Text(formatTime(currentTime)).foregroundColor(.white).font(.caption).frame(width: 40, alignment: .trailing)
-            
-            Slider(value: Binding(get: { currentTime }, set: { newTime in
-                if isWebM {
-                    webMSyncTime?.wrappedValue = newTime
-                    onSeekWebM?(newTime)
-                } else {
-                    currentTime = newTime
-                    player?.seek(to: CMTime(seconds: newTime, preferredTimescale: 600))
-                }
-            }), in: 0...max(duration, 1)).frame(width: 200).accentColor(.white)
-            
-            Text(formatTime(duration)).foregroundColor(.white).font(.caption).frame(width: 40, alignment: .leading)
-            
-            Image(systemName: "speaker.wave.3.fill").foregroundColor(.white)
-            Slider(value: Binding(get: { volume }, set: { newValue in
-                volume = newValue
-                if isWebM {
-                    // WebM 通过 @Binding 自动更新
-                } else {
-                    onVolumeChanged?(newValue)
-                }
-            }), in: 0...1)
-                .frame(width: 80).accentColor(.white)
+            if !isImage {
+                Button(action: { isPlaying ? pauseAction() : playAction() }) {
+                    Image(systemName: isPlaying ? "pause.fill" : "play.fill").font(.title)
+                }.buttonStyle(.plain)
+                Button(action: onNext) { Image(systemName: "forward.fill").font(.title2) }.buttonStyle(.plain)
+                
+                Text(formatTime(currentTime)).foregroundColor(.white).font(.caption).frame(width: 40, alignment: .trailing)
+                
+                Slider(value: Binding(get: { currentTime }, set: { newTime in
+                    if isWebM {
+                        webMSyncTime?.wrappedValue = newTime
+                        onSeekWebM?(newTime)
+                    } else {
+                        currentTime = newTime
+                        player?.seek(to: CMTime(seconds: newTime, preferredTimescale: 600))
+                    }
+                }), in: 0...max(duration, 1)).frame(width: 200).accentColor(.white)
+                
+                Text(formatTime(duration)).foregroundColor(.white).font(.caption).frame(width: 40, alignment: .leading)
+                
+                Image(systemName: "speaker.wave.3.fill").foregroundColor(.white)
+                Slider(value: Binding(get: { volume }, set: { newValue in
+                    volume = newValue
+                    if isWebM {
+                    } else {
+                        onVolumeChanged?(newValue)
+                    }
+                }), in: 0...1)
+                    .frame(width: 80).accentColor(.white)
+            } else {
+                Button(action: onNext) { Image(systemName: "forward.fill").font(.title2) }.buttonStyle(.plain)
+            }
             
             if scale != 1.0 || onResetVideo != nil {
                 Button(action: { 
