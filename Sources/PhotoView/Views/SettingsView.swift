@@ -71,7 +71,7 @@ struct GeneralSettings: View {
                 .frame(width: 150)
             }
             
-            Toggle("默认显示独立窗口工具栏", isOn: $showToolbarByDefault)
+            Toggle("默认显示播放窗口工具栏", isOn: $showToolbarByDefault)
             
             HStack {
                 Text(localization.tr(LocalizedString.version, LocalizedString_en.version))
