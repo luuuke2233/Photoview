@@ -182,7 +182,9 @@ struct FullscreenViewer: View {
                                 if isWebM {
                                     webMSeekTime = time
                                 }
-                            }, onResetVideo: {
+                            }, onVolumeChanged: { newVolume in
+                                avPlayer?.volume = Float(newVolume)
+                            }, webMSyncTime: $currentTime, onResetVideo: {
                                 resetVideoView()
                             })
                             .padding(.bottom, 40)
@@ -430,6 +432,8 @@ struct DraggableToolbar: View {
     let isWebM: Bool
     @Binding var scale: CGFloat
     var onSeekWebM: ((Double) -> Void)?
+    var onVolumeChanged: ((Double) -> Void)?
+    var webMSyncTime: Binding<Double>?
     var onResetVideo: (() -> Void)?
     
     var body: some View {
@@ -443,10 +447,11 @@ struct DraggableToolbar: View {
             Text(formatTime(currentTime)).foregroundColor(.white).font(.caption).frame(width: 40, alignment: .trailing)
             
             Slider(value: Binding(get: { currentTime }, set: { newTime in
-                currentTime = newTime
                 if isWebM {
+                    webMSyncTime?.wrappedValue = newTime
                     onSeekWebM?(newTime)
                 } else {
+                    currentTime = newTime
                     player?.seek(to: CMTime(seconds: newTime, preferredTimescale: 600))
                 }
             }), in: 0...max(duration, 1)).frame(width: 200).accentColor(.white)
@@ -454,7 +459,14 @@ struct DraggableToolbar: View {
             Text(formatTime(duration)).foregroundColor(.white).font(.caption).frame(width: 40, alignment: .leading)
             
             Image(systemName: "speaker.wave.3.fill").foregroundColor(.white)
-            Slider(value: $volume, in: 0...1)
+            Slider(value: Binding(get: { volume }, set: { newValue in
+                volume = newValue
+                if isWebM {
+                    // WebM 通过 @Binding 自动更新
+                } else {
+                    onVolumeChanged?(newValue)
+                }
+            }), in: 0...1)
                 .frame(width: 80).accentColor(.white)
             
             if scale != 1.0 || onResetVideo != nil {

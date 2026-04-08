@@ -127,7 +127,7 @@ struct WebMPlayerViewImpl: NSViewRepresentable {
         if isPlaying {
             nsView.evaluateJavaScript("document.getElementById('player')?.play()")
         } else {
-            nsView.evaluateJavaScript("if(document.getElementById('player')) { document.getElementById('player').pause(); document.getElementById('player').volume = 0; }")
+            nsView.evaluateJavaScript("if(document.getElementById('player')) document.getElementById('player').pause()")
         }
         nsView.evaluateJavaScript("if(document.getElementById('player')) document.getElementById('player').volume = \(volume)")
         
