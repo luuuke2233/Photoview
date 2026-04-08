@@ -52,6 +52,7 @@ struct FullscreenViewer: View {
     @State private var duration: Double = 0
     @State private var volume: Double = 1.0
     @State private var toolbarOffset: CGSize = .zero
+    @AppStorage("showToolbarByDefault") private var showToolbarByDefault = false
     @State private var showToolbar = false
     @State private var playerKey = UUID()
     @State private var isCleanedUp = false
@@ -203,6 +204,7 @@ struct FullscreenViewer: View {
             videoOffset = .zero
             lastVideoDragOffset = .zero
             videoRotation = 0
+            showToolbar = showToolbarByDefault
             actions.cleanup = { cleanupPlayer() }
             actions.cleanupWebM = {
                 self.isPlaying = false

@@ -32,6 +32,7 @@ struct SettingsView: View {
 }
 
 struct GeneralSettings: View {
+    @AppStorage("showToolbarByDefault") private var showToolbarByDefault = false
     @ObservedObject private var appearance = AppearanceManager.shared
     @ObservedObject private var localization = LocalizationManager.shared
     
@@ -69,6 +70,8 @@ struct GeneralSettings: View {
                 .labelsHidden()
                 .frame(width: 150)
             }
+            
+            Toggle("默认显示独立窗口工具栏", isOn: $showToolbarByDefault)
             
             HStack {
                 Text(localization.tr(LocalizedString.version, LocalizedString_en.version))
