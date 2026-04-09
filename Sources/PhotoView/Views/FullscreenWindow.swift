@@ -562,6 +562,7 @@ struct FullscreenViewer: View {
             }
         } else {
             AVPlayerLayerView(player: avPlayer)
+                .id(playerKey)
                 .scaleEffect(videoScale)
                 .rotationEffect(.degrees(videoRotation))
                 .offset(videoOffset)
@@ -686,17 +687,21 @@ struct AVPlayerLayerView: NSViewRepresentable {
 
 @MainActor final class FullscreenWindowController {
     static let shared = FullscreenWindowController()
-    private var win: FullscreenWindow?
-    private var actions: FullscreenActions?
+    
+    private struct WindowRecord {
+        let window: FullscreenWindow
+        let actions: FullscreenActions
+        let delegate: FullscreenWindowDelegate
+    }
+    
+    private var windows: [UUID: WindowRecord] = [:]
     
     func show(item: MediaItem, in items: [MediaItem]) {
-        close()
+        let windowID = UUID()
         let act = FullscreenActions()
-        actions = act
         
-        // 核心修复：绑定关闭窗口的动作
         act.close = { [weak self] in
-            self?.close()
+            self?.close(windowID: windowID)
         }
         
         let viewer = FullscreenViewer(item: item, items: items, actions: act)
@@ -714,41 +719,52 @@ struct AVPlayerLayerView: NSViewRepresentable {
         }
         
         let delegate = FullscreenWindowDelegate {
-            Task { @MainActor in self.actions?.cleanup() }
+            Task { @MainActor in self.close(windowID: windowID) }
         }
         w.delegate = delegate
         
-        w.keyHandler = { [weak self] event in
+        w.keyHandler = { [weak act] event in
             switch event.keyCode {
-            case 123: self?.actions?.goPrev(); return nil
-            case 124: self?.actions?.goNext(); return nil
-            case 126: self?.actions?.seekUp(); return nil
-            case 125: self?.actions?.seekDown(); return nil
-            case 49: self?.actions?.togglePlay(); return nil
-            case 53: self?.actions?.exit(); return nil
+            case 123: act?.goPrev(); return nil
+            case 124: act?.goNext(); return nil
+            case 126: act?.seekUp(); return nil
+            case 125: act?.seekDown(); return nil
+            case 49: act?.togglePlay(); return nil
+            case 53: act?.exit(); return nil
             default: return event
             }
         }
         
-        w.onClose = { [weak self] in
-            self?.actions?.cleanup()
-            self?.actions?.cleanupWebMForce?()
-        }
+        w.onClose = { [weak self] in self?.teardownWindow(windowID: windowID) }
         
         if let s = NSScreen.main {
             let frameInset: CGFloat = item.type == .video ? 140 : 100
-            w.setFrame(s.visibleFrame.insetBy(dx: frameInset, dy: frameInset), display: true)
+            let offsetStep = CGFloat(min(windows.count, 6) * 28)
+            let frame = s.visibleFrame.insetBy(dx: frameInset, dy: frameInset).offsetBy(dx: offsetStep, dy: -offsetStep)
+            w.setFrame(frame, display: true)
         }
-        w.makeKeyAndOrderFront(nil); win = w
+        
+        windows[windowID] = WindowRecord(window: w, actions: act, delegate: delegate)
+        w.makeKeyAndOrderFront(nil)
     }
     
-    func close() { 
-        if let act = actions {
-            Task { @MainActor in
-                act.cleanup()
-            }
+    func closeAll() {
+        for id in Array(windows.keys) {
+            close(windowID: id)
         }
-        win?.close()
-        win = nil 
+    }
+    
+    private func close(windowID: UUID) {
+        guard let record = windows[windowID] else { return }
+        record.window.close()
+    }
+    
+    private func teardownWindow(windowID: UUID) {
+        guard let record = windows.removeValue(forKey: windowID) else { return }
+        record.actions.cleanup()
+        record.actions.cleanupWebMForce?()
+        record.window.keyHandler = nil
+        record.window.onClose = nil
+        record.window.delegate = nil
     }
 }
