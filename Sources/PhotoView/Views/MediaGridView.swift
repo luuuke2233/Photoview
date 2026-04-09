@@ -78,6 +78,15 @@ struct MediaGridView: View {
     
     private func openFS(item: MediaMetadata) {
         let fullItem = MediaItem(url: item.url)
+        
+        if fullItem.type == .video {
+            let videoItems = lib.filteredItems
+                .filter { MediaItem(url: $0.url).type == .video }
+                .map { MediaItem(url: $0.url) }
+            FullscreenWindowController.shared.show(item: fullItem, in: videoItems)
+            return
+        }
+        
         let allItems = lib.filteredItems.map { MediaItem(url: $0.url) }
         FullscreenWindowController.shared.show(item: fullItem, in: allItems)
     }
@@ -122,7 +131,7 @@ struct MediaCell: View {
             .cornerRadius(6)
         }
         .aspectRatio(1, contentMode: .fit)
-        .task { thumb = lib.getThumbnail(for: item, size: CGSize(width: 256, height: 256)) }
+        .task { thumb = await lib.getThumbnail(for: item, size: CGSize(width: 256, height: 256)) }
     }
 }
 
@@ -181,7 +190,7 @@ struct MediaListCell: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
         .background(Color(nsColor: .controlBackgroundColor).opacity(0.3))
-        .task { thumb = lib.getThumbnail(for: item, size: CGSize(width: 120, height: 120)) }
+        .task { thumb = await lib.getThumbnail(for: item, size: CGSize(width: 120, height: 120)) }
     }
     
     private func formatDate(_ date: Date) -> String {

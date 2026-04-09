@@ -23,12 +23,12 @@ A lightweight photo gallery application for macOS.
 
 | Component | Technology |
 |-----------|------------|
-| Language | Swift 6.0 |
+| Language | Swift 5.9 |
 | UI Framework | SwiftUI + AppKit |
 | Metadata | SQLite3 |
-| Media Playback | AVFoundation |
+| Media Playback | AVFoundation + FFmpeg |
 | WebM Support | WebKit |
-| Thumbnails | ImageIO |
+| Thumbnails | ImageIO + FFmpeg |
 
 ### Installation
 
@@ -61,12 +61,12 @@ Or open `Package.swift` in Xcode and press `Cmd + R`.
 
 | 组件 | 技术 |
 |------|------|
-| 语言 | Swift 6.0 |
+| 语言 | Swift 5.9 |
 | UI 框架 | SwiftUI + AppKit |
 | 元数据 | SQLite3 |
-| 媒体播放 | AVFoundation |
+| 媒体播放 | AVFoundation + FFmpeg |
 | WebM 支持 | WebKit |
-| 缩略图 | ImageIO |
+| 缩略图 | ImageIO + FFmpeg |
 
 ### 安装与运行
 

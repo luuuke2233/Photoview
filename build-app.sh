@@ -1,14 +1,90 @@
 #!/bin/bash
-set -e
+set -euo pipefail
 
 PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
-APP_DIR="$PROJECT_DIR/PhotoView.app"
-ICON_DIR="$PROJECT_DIR/icon.iconset"
+VERSION_FILE="$PROJECT_DIR/.beta-version"
+BUILD_DIR="$PROJECT_DIR/.build"
+MODULE_CACHE_DIR="$BUILD_DIR/module-cache"
+CLANG_CACHE_DIR="$BUILD_DIR/clang-module-cache"
+ICNS_PATH="$PROJECT_DIR/AppIcon.icns"
 
-BETA_VERSION="1.5.5"
+usage() {
+    cat <<'EOF'
+Usage:
+  ./build-app.sh              Increment beta number and build a beta app
+  ./build-app.sh --major      Increment base version and reset beta to 1
+  ./build-app.sh --current    Build using the current stored version without incrementing
+EOF
+}
 
-echo "=== Building PhotoView ==="
-swift build -c release --package-path "$PROJECT_DIR"
+if [ ! -f "$VERSION_FILE" ]; then
+    cat > "$VERSION_FILE" <<'EOF'
+BASE_VERSION=1.5.6
+BETA_NUMBER=0
+EOF
+fi
+
+source "$VERSION_FILE"
+
+MODE="increment-beta"
+case "${1:-}" in
+    "")
+        ;;
+    --major)
+        MODE="major"
+        ;;
+    --current)
+        MODE="current"
+        ;;
+    -h|--help)
+        usage
+        exit 0
+        ;;
+    *)
+        usage
+        exit 1
+        ;;
+esac
+
+increment_base_version() {
+    local version="$1"
+    IFS='.' read -r major minor patch <<< "$version"
+    patch=$((patch + 1))
+    printf "%s.%s.%s" "$major" "$minor" "$patch"
+}
+
+case "$MODE" in
+    major)
+        BASE_VERSION="$(increment_base_version "$BASE_VERSION")"
+        BETA_NUMBER=1
+        ;;
+    increment-beta)
+        BETA_NUMBER=$((BETA_NUMBER + 1))
+        ;;
+    current)
+        if [ "$BETA_NUMBER" -le 0 ]; then
+            BETA_NUMBER=1
+        fi
+        ;;
+esac
+
+cat > "$VERSION_FILE" <<EOF
+BASE_VERSION=$BASE_VERSION
+BETA_NUMBER=$BETA_NUMBER
+EOF
+
+BETA_VERSION="${BASE_VERSION}-beta${BETA_NUMBER}"
+APP_NAME="PhotoView-${BETA_VERSION}.app"
+APP_DIR="$PROJECT_DIR/$APP_NAME"
+
+echo "=== Building PhotoView $BETA_VERSION ==="
+mkdir -p "$MODULE_CACHE_DIR" "$CLANG_CACHE_DIR"
+env SWIFTPM_MODULECACHE_OVERRIDE="$MODULE_CACHE_DIR" \
+    CLANG_MODULE_CACHE_PATH="$CLANG_CACHE_DIR" \
+    swift build -c release --package-path "$PROJECT_DIR"
+
+echo "=== Removing previous beta apps ==="
+find "$PROJECT_DIR" -maxdepth 1 -type d -name 'PhotoView-*-beta*.app' ! -name "$APP_NAME" -exec rm -rf {} +
 
 echo "=== Creating .app bundle ==="
 rm -rf "$APP_DIR"
@@ -16,26 +92,25 @@ mkdir -p "$APP_DIR/Contents/MacOS" "$APP_DIR/Contents/Resources"
 
 cp "$PROJECT_DIR/.build/release/PhotoView" "$APP_DIR/Contents/MacOS/PhotoView"
 
-if [ -d "$ICON_DIR" ]; then
-    echo "=== Creating icon from icon.iconset ==="
-    iconutil -c icns "$ICON_DIR" -o "$APP_DIR/Contents/Resources/AppIcon.icns"
-fi
+echo "=== Creating icon from icon/icon.png ==="
+"$PROJECT_DIR/generate-icon.sh" "$ICNS_PATH"
+cp "$ICNS_PATH" "$APP_DIR/Contents/Resources/AppIcon.icns"
 
-cat > "$APP_DIR/Contents/Info.plist" << 'PLIST'
+cat > "$APP_DIR/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
     <key>CFBundleName</key>
-    <string>PhotoView</string>
+    <string>PhotoView Beta</string>
     <key>CFBundleDisplayName</key>
-    <string>PhotoView</string>
+    <string>PhotoView Beta</string>
     <key>CFBundleIdentifier</key>
     <string>com.photoview.app</string>
     <key>CFBundleVersion</key>
-    <string>BETA_VERSION_PLACEHOLDER</string>
+    <string>$BETA_VERSION</string>
     <key>CFBundleShortVersionString</key>
-    <string>BETA_VERSION_PLACEHOLDER</string>
+    <string>$BETA_VERSION</string>
     <key>CFBundleExecutable</key>
     <string>PhotoView</string>
     <key>CFBundlePackageType</key>
@@ -49,7 +124,5 @@ cat > "$APP_DIR/Contents/Info.plist" << 'PLIST'
 </dict>
 </plist>
 PLIST
-
-sed -i '' "s/BETA_VERSION_PLACEHOLDER/$BETA_VERSION/g" "$APP_DIR/Contents/Info.plist"
 
 echo "=== Done! App created at $APP_DIR ==="

@@ -3,3 +3,8 @@
 *.xcodeproj
 *.xcworkspace
 PhotoView.app
+PhotoView-*.app
+PhotoView-*.dmg
+.beta-version
+AppIcon.icns
+.dmg-staging

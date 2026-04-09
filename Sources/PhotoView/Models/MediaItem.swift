@@ -12,14 +12,15 @@ enum MediaType: String, CaseIterable {
     static let supportedVideoTypes: Set<UTType> = [
         .mpeg4Movie, .quickTimeMovie,
         UTType(filenameExtension: "mov")!, UTType(filenameExtension: "mp4")!,
-        UTType(filenameExtension: "mkv")!, UTType(filenameExtension: "webm")!
+        UTType(filenameExtension: "mkv")!, UTType(filenameExtension: "webm")!,
+        UTType(filenameExtension: "avi")!
     ]
     
     static func detectType(for url: URL) -> MediaType? {
         let ext = url.pathExtension.lowercased()
         
         // 核心优化：增加对 webm 的显式支持，防止 UTType 识别失败
-        if ext == "webm" { return .video }
+        if ext == "webm" || ext == "avi" { return .video }
         
         if let uti = UTType(filenameExtension: ext) {
             if supportedImageTypes.contains(uti) { return .image }

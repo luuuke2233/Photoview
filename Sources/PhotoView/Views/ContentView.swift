@@ -1,7 +1,7 @@
 import SwiftUI
 import AppKit
 
-let appVersion = "1.5.5"
+let appVersion = "1.5.6"
 
 struct ToolbarButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
@@ -28,6 +28,7 @@ struct ToolbarLabelButtonStyle: ButtonStyle {
     }
 }
 
+@MainActor
 func zoomWindow() {
     if let window = NSApp.keyWindow {
         window.zoom(nil)

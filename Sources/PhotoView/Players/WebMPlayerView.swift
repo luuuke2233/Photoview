@@ -75,6 +75,8 @@ struct WebMPlayerViewImpl: NSViewRepresentable {
         let htmlURL = parentDir.appendingPathComponent(htmlFileName)
         
         let encodedName = url.lastPathComponent.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? url.lastPathComponent
+        let fileExt = url.pathExtension.lowercased()
+        let videoType = fileExt == "avi" ? "video/x-msvideo" : "video/webm"
         
         let htmlContent = """
         <!DOCTYPE html>
@@ -88,13 +90,18 @@ struct WebMPlayerViewImpl: NSViewRepresentable {
         </head>
         <body>
             <video id="player" autoplay playsinline preload="auto">
-                <source src="\(encodedName)" type="video/webm">
+                <source src="\(encodedName)" type="\(videoType)">
+                <source src="\(encodedName)">
             </video>
             <script>
                 const video = document.getElementById('player');
                 video.addEventListener('loadedmetadata', () => window.webkit.messageHandlers.duration.postMessage(video.duration));
                 video.addEventListener('timeupdate', () => window.webkit.messageHandlers.time.postMessage(video.currentTime));
                 video.addEventListener('ended', () => window.webkit.messageHandlers.ended.postMessage(true));
+                video.addEventListener('error', (e) => {
+                    console.log('Video error:', video.error);
+                    window.webkit.messageHandlers.duration.postMessage(0);
+                });
                 setInterval(() => {
                     if (!video.paused) window.webkit.messageHandlers.time.postMessage(video.currentTime);
                 }, 100);

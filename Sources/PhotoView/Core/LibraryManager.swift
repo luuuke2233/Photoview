@@ -7,12 +7,6 @@ import AVFoundation
 import SQLite3
 import WebKit
 
-class WebMThumbCoordinator: NSObject, WKScriptMessageHandler {
-    let handler: (Any?) -> Void
-    init(messageHandler: @escaping (Any?) -> Void) { self.handler = messageHandler }
-    func userContentController(_ uc: WKUserContentController, didReceive m: WKScriptMessage) { handler(m.body) }
-}
-
 struct FolderNode: Identifiable, Equatable, Hashable {
     let id: UUID; let url: URL; let name: String
     var children: [FolderNode] = []; var mediaCount: Int = 0
@@ -555,10 +549,10 @@ class LibraryManager: ObservableObject {
         sqlite3_finalize(stmt)
     }
     
-    func getThumbnail(for item: MediaMetadata, size: CGSize) -> NSImage? {
+    func getThumbnail(for item: MediaMetadata, size: CGSize) async -> NSImage? {
         let k = "\(item.url.path)-\(size.width)" as NSString
         if let c = thumbnailCache.object(forKey: k) { return c }
-        let t = genThumb(url: item.url, type: item.type, size: size)
+        let t = await genThumb(url: item.url, type: item.type, size: size)
         if let t { thumbnailCache.setObject(t, forKey: k) }; return t
     }
     
@@ -568,22 +562,75 @@ class LibraryManager: ObservableObject {
         return NSImage(data: data)
     }
     
-    private func genThumb(url: URL, type: MediaType, size: CGSize) -> NSImage? {
+    private func genThumb(url: URL, type: MediaType, size: CGSize) async -> NSImage? {
         let ext = url.pathExtension.lowercased()
         
         if type == .image {
             let o: [CFString: Any] = [kCGImageSourceCreateThumbnailFromImageAlways: true, kCGImageSourceCreateThumbnailWithTransform: true, kCGImageSourceThumbnailMaxPixelSize: max(size.width, size.height) * 2]
             guard let s = CGImageSourceCreateWithURL(url as CFURL, nil), let cg = CGImageSourceCreateThumbnailAtIndex(s, 0, o as CFDictionary) else { return nil }
             return NSImage(cgImage: cg, size: .zero)
-        } else if ext == "webm" {
-            return nil
+        } else if ext == "webm" || ext == "avi" {
+            return await genFFmpegThumb(url: url, size: size)
         } else {
             let g = AVAssetImageGenerator(asset: AVURLAsset(url: url)); g.appliesPreferredTrackTransform = true; g.maximumSize = CGSize(width: size.width * 2, height: size.height * 2)
-            guard let cg = try? g.copyCGImage(at: CMTime(seconds: 1, preferredTimescale: 600), actualTime: nil) else { return nil }
-            return NSImage(cgImage: cg, size: .zero)
+            if let cg = try? g.copyCGImage(at: CMTime(seconds: 1, preferredTimescale: 600), actualTime: nil) {
+                return NSImage(cgImage: cg, size: .zero)
+            }
+            return await genFFmpegThumb(url: url, size: size)
         }
     }
+    
+    private func genFFmpegThumb(url: URL, size: CGSize) async -> NSImage? {
+        await Task.detached(priority: .utility) {
+            guard let ffmpegURL = Self.findExecutable(named: "ffmpeg") else { return nil }
+            let thumbDir = FileManager.default.temporaryDirectory.appendingPathComponent("PhotoViewThumbs", isDirectory: true)
+            try? FileManager.default.createDirectory(at: thumbDir, withIntermediateDirectories: true)
+            
+            let attrs = try? FileManager.default.attributesOfItem(atPath: url.path)
+            let modTime = (attrs?[.modificationDate] as? Date)?.timeIntervalSince1970 ?? 0
+            let outputURL = thumbDir.appendingPathComponent("\(abs(url.path.hashValue))-\(Int(modTime))-\(Int(size.width))x\(Int(size.height)).png")
+            
+            if FileManager.default.fileExists(atPath: outputURL.path), let image = NSImage(contentsOf: outputURL) {
+                return image
+            }
+            
+            let maxWidth = max(Int(size.width * 2), 240)
+            let maxHeight = max(Int(size.height * 2), 240)
+            let process = Process()
+            process.executableURL = ffmpegURL
+            process.arguments = [
+                "-hide_banner", "-loglevel", "error",
+                "-y",
+                "-ss", "00:00:01.000",
+                "-i", url.path,
+                "-frames:v", "1",
+                "-vf", "scale=\(maxWidth):\(maxHeight):force_original_aspect_ratio=decrease",
+                outputURL.path
+            ]
+            
+            do {
+                try process.run()
+                process.waitUntilExit()
+                guard process.terminationStatus == 0 else { return nil }
+                return NSImage(contentsOf: outputURL)
+            } catch {
+                return nil
+            }
+        }.value
+    }
     func closeDB() { sqlite3_close(db) }
+    
+    nonisolated private static func findExecutable(named name: String) -> URL? {
+        let candidates = [
+            "/opt/homebrew/bin/\(name)",
+            "/usr/local/bin/\(name)",
+            "/usr/bin/\(name)"
+        ]
+        for path in candidates where FileManager.default.isExecutableFile(atPath: path) {
+            return URL(fileURLWithPath: path)
+        }
+        return nil
+    }
 }
 
 extension LibraryManager { func expandRootFolder(_ node: FolderNode) async { await expandFolder(node) } }
