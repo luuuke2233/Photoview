@@ -10,7 +10,7 @@
 
 A lightweight photo gallery application for macOS.
 
-![Screenshot](screenshot1.png)
+![Screenshot](screenshot2.png)
 
 ### Supported Formats
 
@@ -48,7 +48,7 @@ Or open `Package.swift` in Xcode and press `Cmd + R`.
 
 适用于 macOS 的轻量级相册浏览应用。
 
-![截图](screenshot1.png)
+![截图](screenshot2.png)
 
 ### 支持格式
 
