@@ -146,6 +146,20 @@ struct CustomToolbar: View {
                 }
                 .buttonStyle(ToolbarLabelButtonStyle())
                 
+            case .selectAll:
+                Button(action: { lib.selectAllItems() }) {
+                    Image(systemName: "checkmark.circle")
+                }
+                .buttonStyle(ToolbarButtonStyle())
+                .help("Select All")
+                
+            case .deselect:
+                Button(action: { lib.clearSelection() }) {
+                    Image(systemName: "circle")
+                }
+                .buttonStyle(ToolbarButtonStyle())
+                .help("Deselect")
+                
             case .filter:
                 Picker(localization.tr(LocalizedString.filter, LocalizedString_en.filter), selection: $lib.filterOption) {
                     ForEach(FilterOption.allCases) { option in
@@ -300,6 +314,8 @@ struct ToolbarCustomizationPanel: View {
         switch type {
         case .refresh: return localization.tr(LocalizedString.refresh, LocalizedString_en.refresh)
         case .addFolder: return localization.tr(LocalizedString.addFolder, LocalizedString_en.addFolder)
+        case .selectAll: return "Select All"
+        case .deselect: return "Deselect"
         case .filter: return localization.tr(LocalizedString.filter, LocalizedString_en.filter)
         case .sort: return localization.tr(LocalizedString.sort, LocalizedString_en.sort)
         case .viewMode: return "View Mode"

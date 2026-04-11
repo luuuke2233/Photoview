@@ -650,6 +650,13 @@ class LibraryManager: ObservableObject {
         selectedMedia.removeAll()
     }
     
+    func selectAllItems() {
+        selectedMedia.removeAll()
+        for item in filteredItems {
+            selectedMedia.insert(item.id)
+        }
+    }
+    
     func selectItems(in rect: CGRect, gridItemFrames: [UUID: CGRect]) {
         selectedMedia.removeAll()
         for (id, frame) in gridItemFrames {

@@ -24,6 +24,8 @@ enum ViewMode: String, CaseIterable, Codable, Identifiable {
 enum ToolbarItemType: String, CaseIterable, Codable, Identifiable {
     case refresh = "refresh"
     case addFolder = "addFolder"
+    case selectAll = "selectAll"
+    case deselect = "deselect"
     case filter = "filter"
     case sort = "sort"
     case viewMode = "viewMode"
@@ -35,6 +37,8 @@ enum ToolbarItemType: String, CaseIterable, Codable, Identifiable {
         switch self {
         case .refresh: return "arrow.clockwise"
         case .addFolder: return "folder.badge.plus"
+        case .selectAll: return "checkmark.circle"
+        case .deselect: return "circle"
         case .filter: return "line.3.horizontal.decrease.circle"
         case .sort: return "arrow.up.arrow.down"
         case .viewMode: return "square.grid.2x2"
@@ -48,7 +52,7 @@ enum ToolbarItemType: String, CaseIterable, Codable, Identifiable {
     
     var isBuiltIn: Bool {
         switch self {
-        case .refresh, .addFolder, .filter, .sort, .folderInfo: return true
+        case .refresh, .addFolder, .selectAll, .deselect, .filter, .sort, .folderInfo: return true
         case .viewMode: return false
         }
     }
