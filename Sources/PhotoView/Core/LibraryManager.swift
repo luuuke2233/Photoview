@@ -675,6 +675,15 @@ class LibraryManager: ObservableObject {
             } else {
                 selectedMedia.insert(item.id)
             }
+        } else {
+            if selectedMedia.contains(item.id) {
+                selectedMedia.remove(item.id)
+                if lastSelectedMediaId == item.id {
+                    lastSelectedMediaId = nil
+                }
+            } else {
+                selectedMedia.insert(item.id)
+            }
         }
         lastSelectedMediaId = item.id
     }
