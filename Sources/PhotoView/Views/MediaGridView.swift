@@ -220,6 +220,12 @@ struct MediaListCell: View {
             let addToSelection = NSEvent.modifierFlags.contains(.shift) && lib.lastSelectedMediaId != nil
             lib.handleClickSelection(for: item, addToSelection: addToSelection)
         }
+        .onDrag {
+            if isSelected {
+                return NSItemProvider(object: "selected-media" as NSString)
+            }
+            return NSItemProvider(object: item.url.path as NSString)
+        }
         .task { thumb = await lib.getThumbnail(for: item, size: CGSize(width: 120, height: 120)) }
     }
     
