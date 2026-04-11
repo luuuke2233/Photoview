@@ -1,0 +1,10 @@
+.build
+.DS_Store
+*.xcodeproj
+*.xcworkspace
+PhotoView.app
+PhotoView-*.app
+PhotoView-*.dmg
+.beta-version
+AppIcon.icns
+.dmg-staging
