@@ -29,6 +29,7 @@ class LibraryManager: ObservableObject {
     @Published var selectedFolder: FolderNode?
     @Published var filteredItems: [MediaMetadata] = []
     @Published var selectedMedia: Set<UUID> = []
+    @Published var lastSelectedMediaId: UUID? = nil
     @Published var isDragTargetFolder: FolderNode? = nil
     @Published var isLoading = false
     @Published var isScanningFolder = false
@@ -652,9 +653,30 @@ class LibraryManager: ObservableObject {
     
     func selectAllItems() {
         selectedMedia.removeAll()
+        lastSelectedMediaId = nil
         for item in filteredItems {
             selectedMedia.insert(item.id)
         }
+    }
+    
+    func handleClickSelection(for item: MediaMetadata, addToSelection: Bool) {
+        if addToSelection {
+            if let lastId = lastSelectedMediaId {
+                let lastIndex = filteredItems.firstIndex { $0.id == lastId }
+                let currentIndex = filteredItems.firstIndex { $0.id == item.id }
+                
+                if let li = lastIndex, let ci = currentIndex {
+                    let start = min(li, ci)
+                    let end = max(li, ci)
+                    for i in start...end {
+                        selectedMedia.insert(filteredItems[i].id)
+                    }
+                }
+            } else {
+                selectedMedia.insert(item.id)
+            }
+        }
+        lastSelectedMediaId = item.id
     }
     
     func selectItems(in rect: CGRect, gridItemFrames: [UUID: CGRect]) {

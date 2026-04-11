@@ -98,6 +98,7 @@ struct MediaCell: View {
     let gridSize: Double
     @EnvironmentObject var lib: LibraryManager
     @State private var thumb: NSImage?
+    @State private var isShiftPressed = false
     
     private var isSelected: Bool { lib.isSelected(item) }
     private var hasSelection: Bool { !lib.selectedMedia.isEmpty }
@@ -139,7 +140,10 @@ struct MediaCell: View {
             )
         }
         .aspectRatio(1, contentMode: .fit)
-        .onTapGesture(count: 1) { lib.toggleSelection(for: item) }
+        .onTapGesture(count: 1) {
+            let addToSelection = NSEvent.modifierFlags.contains(.shift) && lib.lastSelectedMediaId != nil
+            lib.handleClickSelection(for: item, addToSelection: addToSelection)
+        }
         .onDrag {
             if isSelected {
                 return NSItemProvider(object: "selected-media" as NSString)
@@ -212,7 +216,10 @@ struct MediaListCell: View {
         .padding(.vertical, 8)
         .background(Color(nsColor: .controlBackgroundColor).opacity(0.3))
         .background(isSelected ? Color.blue.opacity(0.1) : Color.clear)
-        .onTapGesture(count: 1) { lib.toggleSelection(for: item) }
+        .onTapGesture(count: 1) {
+            let addToSelection = NSEvent.modifierFlags.contains(.shift) && lib.lastSelectedMediaId != nil
+            lib.handleClickSelection(for: item, addToSelection: addToSelection)
+        }
         .task { thumb = await lib.getThumbnail(for: item, size: CGSize(width: 120, height: 120)) }
     }
     
