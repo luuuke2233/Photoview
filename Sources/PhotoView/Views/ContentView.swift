@@ -151,14 +151,14 @@ struct CustomToolbar: View {
                     Image(systemName: "checkmark.circle")
                 }
                 .buttonStyle(ToolbarButtonStyle())
-                .help("Select All")
+                .help(localization.tr(LocalizedString.selectAll, LocalizedString_en.selectAll))
                 
             case .deselect:
                 Button(action: { lib.clearSelection() }) {
                     Image(systemName: "circle")
                 }
                 .buttonStyle(ToolbarButtonStyle())
-                .help("Deselect")
+                .help(localization.tr(LocalizedString.deselect, LocalizedString_en.deselect))
                 
             case .filter:
                 Picker(localization.tr(LocalizedString.filter, LocalizedString_en.filter), selection: $lib.filterOption) {
@@ -314,8 +314,8 @@ struct ToolbarCustomizationPanel: View {
         switch type {
         case .refresh: return localization.tr(LocalizedString.refresh, LocalizedString_en.refresh)
         case .addFolder: return localization.tr(LocalizedString.addFolder, LocalizedString_en.addFolder)
-        case .selectAll: return "Select All"
-        case .deselect: return "Deselect"
+        case .selectAll: return localization.tr(LocalizedString.selectAll, LocalizedString_en.selectAll)
+        case .deselect: return localization.tr(LocalizedString.deselect, LocalizedString_en.deselect)
         case .filter: return localization.tr(LocalizedString.filter, LocalizedString_en.filter)
         case .sort: return localization.tr(LocalizedString.sort, LocalizedString_en.sort)
         case .viewMode: return "View Mode"
